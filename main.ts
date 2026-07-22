@@ -139,15 +139,6 @@ export default class KuaifanyiPlugin extends Plugin {
 
     this.startFollow();
 
-    // 检测右下角拖拽调整（resize 手柄区），解除最大宽高限制
-    this.registerDomEvent(this.popup, "mousedown", (e: MouseEvent) => {
-      if (!this.popup) return;
-      const r = this.popup.getBoundingClientRect();
-      const nearRight = e.clientX > r.right - 24;
-      const nearBottom = e.clientY > r.bottom - 24;
-      if (nearRight && nearBottom) this.popup.addClass("kfy-free-size");
-    });
-
     if (this.settings.autoTranslate) {
       const d = this.popup.createDiv("kfy-section");
       const label = d.createDiv("kfy-label");
@@ -222,10 +213,23 @@ export default class KuaifanyiPlugin extends Plugin {
     let rect: DOMRect;
     try { rect = range.getBoundingClientRect(); }
     catch { return { top: 100, left: 100 }; }
-    const top = rect.bottom - wsRect.top + 8;
+
+    // 弹窗实际高度（未渲染时按估计值）
+    const popupH = this.popup?.offsetHeight || 220;
+    // 内容比界面还高：限高到界面内（唯一的高度约束）
+    if (this.popup) {
+      this.popup.style.maxHeight =
+        popupH > wsRect.height - 16 ? `${wsRect.height - 16}px` : "";
+    }
+
+    // 默认放选区下方；底边越界则上移贴齐界面底
+    let top = rect.bottom - wsRect.top + 8;
+    if (top + popupH > wsRect.height - 8) {
+      top = Math.max(8, wsRect.height - popupH - 8);
+    }
     const left = rect.left - wsRect.left;
     return {
-      top: Math.max(8, Math.min(top, wsRect.height - 240)),
+      top: Math.max(8, top),
       left: Math.max(8, Math.min(left, wsRect.width - 480)),
     };
   }
