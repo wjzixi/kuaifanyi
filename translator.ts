@@ -1,0 +1,145 @@
+import { requestUrl } from "obsidian";
+import type { KuaifanyiSettings } from "./settings";
+import { API_PRESETS } from "./settings";
+
+// ---- SSE 流式请求 ----
+async function fetchStream(
+  apiUrl: string, apiKey: string, model: string,
+  systemPrompt: string, userText: string,
+  onChunk: (text: string) => void
+): Promise<string> {
+  const resp = await fetch(apiUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model, temperature: 0.3, max_tokens: 4096, stream: true,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userText },
+      ],
+    }),
+  });
+  if (!resp.ok || !resp.body) throw new Error(`流式请求失败 (${resp.status})`);
+
+  const reader = resp.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "", fullText = "";
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed || !trimmed.startsWith("data:")) continue;
+      const data = trimmed.slice(5).trim();
+      if (data === "[DONE]") continue;
+      try {
+        const delta = JSON.parse(data).choices?.[0]?.delta?.content;
+        if (delta) { fullText += delta; onChunk(fullText); }
+      } catch {}
+    }
+  }
+  return fullText.trim();
+}
+
+// ---- 工具 ----
+export function isChinese(text: string): boolean {
+  const chinese = text.match(/[\u4e00-\u9fff]/g);
+  return chinese ? chinese.length / text.length > 0.3 : false;
+}
+
+export function detectTargetLang(text: string): string {
+  return isChinese(text) ? "English" : "中文";
+}
+
+/** 判断是否为单词/组词（查词典模式） */
+export function isWord(text: string): boolean {
+  const t = text.trim();
+  if (isChinese(t)) {
+    // 中文词组：不长，没有句末标点
+    return t.length <= 20 && !/[。！？\n]/.test(t);
+  }
+  // 英文单词：单个词或简短短语
+  return t.length <= 50 && !/[.!?\n]/.test(t) && t.split(/\s+/).length <= 5;
+}
+
+// ---- 模型列表 ----
+export async function fetchModels(settings: KuaifanyiSettings): Promise<string[]> {
+  const apiUrl = getApiUrl(settings);
+  const baseUrl = apiUrl.replace(/\/chat\/completions\/?$/, "");
+  const resp = await requestUrl({
+    url: baseUrl + "/models", method: "GET",
+    headers: { Authorization: `Bearer ${settings.apiKey}` },
+  });
+  if (resp.status !== 200) throw new Error(`获取模型列表失败 (${resp.status})`);
+  return (resp.json.data || []).map((m: any) => m.id || m.model || m.name).filter(Boolean).sort();
+}
+
+// ---- 词典式查词（模仿有道） ----
+export function streamDictLookup(
+  text: string, settings: KuaifanyiSettings,
+  onChunk: (text: string) => void
+): Promise<string> {
+  const model = settings.translateModel || getDefaultModel(settings);
+  const srcLang = isChinese(text) ? "中文" : "英文";
+  const tgtLang = isChinese(text) ? "英文" : "中文";
+
+  const prompt = `你是一部全面的多领域词典。请详细解释"${text}"（${srcLang}），翻译为${tgtLang}：
+
+**音标**: [音标]
+**释义**:（列出所有常见释义，标注词性和使用领域）
+- (词性/领域) 释义1
+- (词性/领域) 释义2
+- (词性/领域) 释义3
+**专业释义**:（如在计算机、医学、法律、金融、工程等专业领域的含义）
+- (领域) 释义
+**例句**:
+1. 英文例句 — 中文翻译
+2. 英文例句 — 中文翻译
+
+规则：
+- 如果是大写缩写（如 API、HTTP），先列出全称，再给各领域释义
+- 如果是词组/成语，给出整体释义、用法和例句
+- 如果有常用搭配，也一并列出
+- 音标优先用 IPA 格式
+- 只输出上述格式，不要多余内容。`;
+
+  return fetchStream(getApiUrl(settings), settings.apiKey, model, prompt, text, onChunk);
+}
+
+// ---- 流式翻译 ----
+export function streamTranslate(
+  text: string, settings: KuaifanyiSettings,
+  onChunk: (text: string) => void
+): Promise<string> {
+  const targetLang = detectTargetLang(text);
+  const model = settings.translateModel || getDefaultModel(settings);
+  return fetchStream(
+    getApiUrl(settings), settings.apiKey, model,
+    `你是一个专业的翻译助手。将用户输入的文本翻译为${targetLang}。只输出翻译结果。`,
+    text, onChunk
+  );
+}
+
+// ---- 流式解释 ----
+export function streamExplain(
+  text: string, settings: KuaifanyiSettings,
+  onChunk: (text: string) => void
+): Promise<string> {
+  const model = settings.explainModel || "deepseek-v4-flash";
+  return fetchStream(
+    getApiUrl(settings), settings.apiKey, model,
+    "你是一个简洁的知识助手。用一段话解释用户选中的内容，包含背景、核心概念和关键信息。回答简洁，不超过300字。",
+    text, onChunk
+  );
+}
+
+export function getApiUrl(settings: KuaifanyiSettings): string {
+  return settings.apiProvider === "custom" ? settings.customApiUrl : API_PRESETS[settings.apiProvider].apiUrl;
+}
+function getDefaultModel(settings: KuaifanyiSettings): string {
+  return settings.apiProvider === "custom" ? settings.customModel : API_PRESETS[settings.apiProvider].model;
+}
