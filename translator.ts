@@ -2,6 +2,32 @@ import { requestUrl } from "obsidian";
 import type { KuaifanyiSettings } from "./settings";
 import { API_PRESETS } from "./settings";
 
+// ---- 用量统计（最近一次请求） ----
+export interface UsageInfo { prompt: number; completion: number; total: number; }
+export const usageStats = {
+  last: { prompt: 0, completion: 0, total: 0 } as UsageInfo,
+  session: { prompt: 0, completion: 0, total: 0 } as UsageInfo,
+};
+
+/** 查询 DeepSeek 账户余额，返回 "¥xx.xx" 或 null */
+export async function fetchBalance(settings: KuaifanyiSettings): Promise<string | null> {
+  try {
+    const baseUrl = getApiUrl(settings).replace(/\/chat\/completions\/?$/, "");
+    const resp = await requestUrl({
+      url: baseUrl + "/user/balance", method: "GET",
+      headers: { Authorization: `Bearer ${settings.apiKey}` },
+      throw: false,
+    });
+    if (resp.status !== 200) return null;
+    const infos = resp.json?.balance_infos;
+    if (Array.isArray(infos) && infos.length > 0) {
+      const b = infos[0];
+      return `${b.currency === "CNY" ? "¥" : "$"}${b.total_balance}`;
+    }
+    return null;
+  } catch { return null; }
+}
+
 // ---- SSE 流式请求 ----
 async function fetchStream(
   apiUrl: string, apiKey: string, model: string,
@@ -13,6 +39,7 @@ async function fetchStream(
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
       model, temperature: 0.3, max_tokens: 4096, stream: true,
+      stream_options: { include_usage: true },
       messages: [
         { role: "system", content: systemPrompt },
         { role: "user", content: userText },
@@ -37,7 +64,21 @@ async function fetchStream(
       const data = trimmed.slice(5).trim();
       if (data === "[DONE]") continue;
       try {
-        const delta = JSON.parse(data).choices?.[0]?.delta?.content;
+        const parsed = JSON.parse(data);
+        // 末尾的 usage 块（stream_options.include_usage）
+        if (parsed.usage) {
+          const u = parsed.usage;
+          usageStats.last = {
+            prompt: u.prompt_tokens || 0,
+            completion: u.completion_tokens || 0,
+            total: u.total_tokens || 0,
+          };
+          usageStats.session.prompt += usageStats.last.prompt;
+          usageStats.session.completion += usageStats.last.completion;
+          usageStats.session.total += usageStats.last.total;
+          continue;
+        }
+        const delta = parsed.choices?.[0]?.delta?.content;
         if (delta) { fullText += delta; onChunk(fullText); }
       } catch {}
     }

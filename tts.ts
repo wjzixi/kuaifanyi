@@ -25,6 +25,9 @@ let currentAudio: HTMLAudioElement | null = null;
 let queue: SpeechSynthesisUtterance[] = [];
 let speaking = false;
 
+/** 火山合成字符统计（本次会话） */
+export const volcanoUsage = { chars: 0, calls: 0 };
+
 /**
  * 清洗文本供朗读：
  * - 剔除装饰性符号（括号、Markdown 标记等），不念出声
@@ -121,6 +124,8 @@ async function volcanoSpeak(text: string, settings: KuaifanyiSettings): Promise<
     for (const chunk of chunks) {
       if (!speaking) break; // 被中止
       const blob = await volcanoSynth(chunk, settings);
+      volcanoUsage.chars += chunk.length;
+      volcanoUsage.calls += 1;
       if (!speaking) break;
       await playBlob(blob);
     }

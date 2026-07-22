@@ -3,8 +3,8 @@ import {
 } from "obsidian";
 import type { KuaifanyiSettings } from "./settings";
 import { DEFAULT_SETTINGS, API_PRESETS, ApiProvider } from "./settings";
-import { streamTranslate, streamExplain, streamDictLookup, fetchModels, isChinese, isWord } from "./translator";
-import { speak, stopSpeaking, getChineseVoices, VOLCANO_VOICES } from "./tts";
+import { streamTranslate, streamExplain, streamDictLookup, fetchModels, fetchBalance, usageStats, isChinese, isWord } from "./translator";
+import { speak, stopSpeaking, getChineseVoices, VOLCANO_VOICES, volcanoUsage } from "./tts";
 
 const PROVIDERS: ApiProvider[] = ["deepseek", "custom"];
 
@@ -21,6 +21,8 @@ export default class KuaifanyiPlugin extends Plugin {
   private popupMoved = false;
   private followFrame: number | null = null;
   private streamSeq = 0; // 流式请求序号，用于竞态中止
+  private usageEl: HTMLElement | null = null;
+  private balanceText = "";
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -77,7 +79,7 @@ export default class KuaifanyiPlugin extends Plugin {
       void this.doStream(text);
     }
 
-    if (this.settings.autoRead && !this.settings.autoTranslate && isChinese(text)) {
+    if (this.settings.autoRead && !this.settings.autoTranslate) {
       speak(text, this.settings);
     }
   }
@@ -100,7 +102,7 @@ export default class KuaifanyiPlugin extends Plugin {
           if (seq !== this.streamSeq) return result;
           if (this.transEl) twTrans.finish(this.transEl, result);
           this.lastTrans = result;
-          if (this.settings.autoRead && result && isChinese(result)) speak(result, this.settings);
+          if (this.settings.autoRead && result) speak(result, this.settings);
           return result;
         })
       );
@@ -121,6 +123,8 @@ export default class KuaifanyiPlugin extends Plugin {
     }
 
     await Promise.allSettled(promises);
+    this.updateUsage();
+    this.refreshBalance();
   }
   // ---- 弹窗 ----
   private showPopup(range: Range, isDict: boolean): void {
@@ -171,6 +175,30 @@ export default class KuaifanyiPlugin extends Plugin {
       const b = btnRow.createEl("button", { text: "📢 读解释" });
       b.onclick = () => { if (this.lastExpl) speak(this.lastExpl, this.settings); };
     }
+
+    // 底部用量栏
+    this.usageEl = this.popup.createDiv("kfy-usage");
+    this.updateUsage();
+  }
+
+  private updateUsage(): void {
+    if (!this.usageEl) return;
+    const parts: string[] = [];
+    if (usageStats.last.total > 0) {
+      parts.push(`token ${usageStats.last.total}（入${usageStats.last.prompt}/出${usageStats.last.completion}）`);
+    }
+    if (volcanoUsage.chars > 0) {
+      parts.push(`语音 ${volcanoUsage.chars}字`);
+    }
+    if (this.balanceText) parts.push(`余额 ${this.balanceText}`);
+    this.usageEl.textContent = parts.join("  ·  ");
+  }
+
+  private refreshBalance(): void {
+    if (!this.settings.apiKey) return;
+    void fetchBalance(this.settings).then((b) => {
+      if (b) { this.balanceText = b; this.updateUsage(); }
+    });
   }
 
   private hidePopup(): void {
@@ -184,6 +212,7 @@ export default class KuaifanyiPlugin extends Plugin {
     if (this.popup) { this.popup.remove(); this.popup = null; }
     this.transEl = null;
     this.explEl = null;
+    this.usageEl = null;
     if (this.followFrame !== null) { cancelAnimationFrame(this.followFrame); this.followFrame = null; }
   }
 
@@ -383,7 +412,7 @@ class KuaifanyiSettingTab extends PluginSettingTab {
     new Setting(containerEl).setName("选中自动解释").setDesc("选中后自动解释")
       .addToggle((tg) => tg.setValue(this.plugin.settings.autoExplain)
         .onChange(async (v) => { this.plugin.settings.autoExplain = v; await this.plugin.saveSettings(); }));
-    new Setting(containerEl).setName("选中自动朗读（仅中文）").setDesc("翻译完成后立即朗读中文结果")
+    new Setting(containerEl).setName("选中自动朗读").setDesc("翻译完成后立即朗读（中英文都读）")
       .addToggle((tg) => tg.setValue(this.plugin.settings.autoRead)
         .onChange(async (v) => { this.plugin.settings.autoRead = v; await this.plugin.saveSettings(); }));
     new Setting(containerEl).setName("触发延迟(ms)").setDesc("选中后等待多久触发")
