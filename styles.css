@@ -95,6 +95,10 @@
   font-size: var(--font-ui-smaller);
   color: var(--text-faint);
   user-select: none;
+}
+
+.kfy-usage-line {
+  line-height: 1.6;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

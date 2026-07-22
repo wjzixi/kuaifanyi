@@ -174,15 +174,24 @@ export default class KuaifanyiPlugin extends Plugin {
 
   private updateUsage(): void {
     if (!this.usageEl) return;
-    const parts: string[] = [];
+    this.usageEl.empty();
+
+    // 第一行：DeepSeek（token 消耗 + 余额）
+    const dsParts: string[] = [];
     if (usageStats.last.total > 0) {
-      parts.push(`token ${usageStats.last.total}（入${usageStats.last.prompt}/出${usageStats.last.completion}）`);
+      dsParts.push(`token ${usageStats.last.total}（入${usageStats.last.prompt}/出${usageStats.last.completion}）`);
     }
+    if (this.balanceText) dsParts.push(`余额 ${this.balanceText}`);
+    if (dsParts.length > 0) {
+      const line1 = this.usageEl.createDiv("kfy-usage-line");
+      line1.textContent = `DeepSeek  ${dsParts.join("  ·  ")}`;
+    }
+
+    // 第二行：语音合成（字符消耗）
     if (volcanoUsage.chars > 0) {
-      parts.push(`语音 ${volcanoUsage.chars}字`);
+      const line2 = this.usageEl.createDiv("kfy-usage-line");
+      line2.textContent = `语音合成  ${volcanoUsage.chars} 字 / ${volcanoUsage.calls} 次`;
     }
-    if (this.balanceText) parts.push(`余额 ${this.balanceText}`);
-    this.usageEl.textContent = parts.join("  ·  ");
   }
 
   private refreshBalance(): void {
