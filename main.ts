@@ -205,7 +205,7 @@ export default class KuaifanyiPlugin extends Plugin {
     if (!this.usageEl) return;
     this.usageEl.empty();
 
-    // 第一行：DeepSeek（会话累计 token + 余额）
+    // 第一行：API 用量（会话累计 token + 余额）
     const dsParts: string[] = [];
     if (usageStats.session.total > 0) {
       dsParts.push(`token ${usageStats.session.total}（入${usageStats.session.prompt}/出${usageStats.session.completion}）`);
@@ -213,7 +213,7 @@ export default class KuaifanyiPlugin extends Plugin {
     if (this.balanceText) dsParts.push(`余额 ${this.balanceText}`);
     if (dsParts.length > 0) {
       const line1 = this.usageEl.createDiv("kfy-usage-line");
-      line1.textContent = `DeepSeek  ${dsParts.join("  ·  ")}`;
+      line1.textContent = "API  " + dsParts.join("  ·  ");
     }
 
     // 第二行：语音合成（本地统计+官网实时+余额）
@@ -231,7 +231,7 @@ export default class KuaifanyiPlugin extends Plugin {
   }
 
   private async refreshBalance(): Promise<void> {
-    // DeepSeek 余额
+    // API 余额
     if (this.settings.apiKey) {
       try { const b = await fetchBalance(this.settings); if (b) { this.balanceText = b; } } catch {}
     }

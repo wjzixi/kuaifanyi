@@ -9,7 +9,7 @@ export const usageStats = {
   session: { prompt: 0, completion: 0, total: 0 } as UsageInfo,
 };
 
-/** 查询 DeepSeek 账户余额，返回 "¥xx.xx" 或 null */
+/** 查询账户余额（OpenAI 兼容 /user/balance 端点），返回 "¥xx.xx" 或 null */
 export async function fetchBalance(settings: KuaifanyiSettings): Promise<string | null> {
   try {
     const baseUrl = getApiUrl(settings).replace(/\/chat\/completions\/?$/, "");
