@@ -11,7 +11,7 @@ const PROVIDERS: ApiProvider[] = ["deepseek", "qwen", "doubao", "kimi", "zhipu",
 
 export default class KuaifanyiPlugin extends Plugin {
   settings!: KuaifanyiSettings;
-  cachedModels: string[] = [];
+  cachedModels: Record<string, string[]> = {}; // 按提供商缓存模型列表
   private timer: number | null = null;
   private popup: HTMLElement | null = null;
   private transEl: HTMLElement | null = null;
@@ -355,7 +355,10 @@ export default class KuaifanyiPlugin extends Plugin {
   }
 
   async tryFetchModels(): Promise<void> {
-    try { this.cachedModels = await fetchModels(this.settings); }
+    try {
+      const models = await fetchModels(this.settings);
+      this.cachedModels[this.settings.apiProvider] = models;
+    }
     catch { /* 静默失败 */ }
   }
 
@@ -430,7 +433,7 @@ class KuaifanyiSettingTab extends PluginSettingTab {
 
   display(): void {
     const { containerEl } = this;
-    const models = this.plugin.cachedModels;
+    const models = this.plugin.cachedModels[this.plugin.settings.apiProvider] || [];
     containerEl.empty();
     containerEl.createEl("h2", { text: "快翻译 - 设置" });
 
@@ -449,6 +452,8 @@ class KuaifanyiSettingTab extends PluginSettingTab {
           const cached = this.plugin.settings.providerKeys[v];
           this.plugin.settings.apiKey = cached || "";
           await this.plugin.saveSettings();
+          // 刷新模型列表（新提供商）
+          void this.plugin.tryFetchModels();
           this.display();
         });
       });
@@ -605,7 +610,21 @@ class KuaifanyiSettingTab extends PluginSettingTab {
       new Setting(containerEl).setName("缓存目录").setDesc(`存放音频文件，默认 ${defaultCacheDir}`)
         .addText((t) => t.setPlaceholder(defaultCacheDir)
           .setValue(this.plugin.settings.ttsCacheDir)
-          .onChange(async (v) => { this.plugin.settings.ttsCacheDir = v; await this.plugin.saveSettings(); }));
+          .onChange(async (v) => { this.plugin.settings.ttsCacheDir = v; await this.plugin.saveSettings(); }))
+        .addButton((btn) => btn.setButtonText("浏览").onClick(async () => {
+          try {
+            const { dialog } = (require("electron") as any).remote || require("electron");
+            const result = await dialog.showOpenDialog({ properties: ["openDirectory"] });
+            if (!result.canceled && result.filePaths?.length > 0) {
+              const path = result.filePaths[0];
+              this.plugin.settings.ttsCacheDir = path;
+              await this.plugin.saveSettings();
+              this.display();
+            }
+          } catch (e: any) {
+            new Notice(`无法打开文件夹选择器: ${e.message}`);
+          }
+        }));
 
       new Setting(containerEl).setName("清除语音缓存").setDesc("删除所有已缓存的语音文件")
         .addButton((btn) => btn.setButtonText("立即清除").onClick(() => {
