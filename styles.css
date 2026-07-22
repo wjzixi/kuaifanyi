@@ -58,6 +58,10 @@
   padding: var(--size-4-2) var(--size-4-3);
   background: var(--background-secondary);
   border-radius: var(--radius-s);
+  /* 允许常规文本选取（单击拖拽/双击选词/三击选段） */
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
 }
 
 /* 按钮行：对齐 Obsidian 原生按钮 */
