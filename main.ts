@@ -5,7 +5,7 @@ import type { KuaifanyiSettings } from "./settings";
 import { DEFAULT_SETTINGS, API_PRESETS, ApiProvider } from "./settings";
 import { streamTranslate, streamExplain, streamDictLookup, fetchModels, fetchBalance, usageStats, isChinese, isWord } from "./translator";
 import { speak, stopSpeaking, getChineseVoices, VOLCANO_VOICES, volcanoUsage, VOLCANO_MONTHLY_QUOTA } from "./tts";
-import { fetchVolcanoBalance, fetchVolcanoUsage } from "./volc-billing";
+import { fetchVolcanoBalance, fetchVolcanoUsage, lastSignDiag } from "./volc-billing";
 
 const PROVIDERS: ApiProvider[] = ["deepseek", "custom"];
 
@@ -215,15 +215,10 @@ export default class KuaifanyiPlugin extends Plugin {
     if (volcanoAccessKeyId && volcanoSecretAccessKey) {
       try {
         const b = await fetchVolcanoBalance(volcanoAccessKeyId, volcanoSecretAccessKey);
-        if (b !== null) {
-          this.volcanoBalanceText = `¥${b.toFixed(2)}`;
-        } else {
-          this.volcanoBalanceText = "¥—";
-          new Notice("火山余额查询失败（签名/网络），已显示 ¥—", 5000);
-        }
-      } catch {
+        this.volcanoBalanceText = `¥${b.toFixed(2)}`;
+      } catch (e: any) {
         this.volcanoBalanceText = "¥—";
-        new Notice("火山余额查询异常", 5000);
+        new Notice(`火山余额失败 [401] ${lastSignDiag}`, 12000);
       }
       // 官方用量（免费额度内可能为0，回退本地统计）
       const now = new Date();
@@ -258,22 +253,32 @@ export default class KuaifanyiPlugin extends Plugin {
     try { rect = range.getBoundingClientRect(); }
     catch { return { top: 100, left: 100 }; }
 
-    // 弹窗实际高度（未渲染时按估计值）
+    // 选区已滚出视口（rect 为零），保持当前位置不变
+    if (rect.width === 0 && rect.height === 0) {
+      return this.popup ? { top: this.popup.offsetTop, left: this.popup.offsetLeft } : { top: 100, left: 100 };
+    }
+
+    // 找到内容可见区域上限（标题栏以下），避免弹窗遮挡标题
+    const view = this.app.workspace.getActiveViewOfType(MarkdownView);
+    const contentTop = view
+      ? Math.max(wsRect.top, (view.contentEl.getBoundingClientRect?.().top ?? 0))
+      : wsRect.top;
+
     const popupH = this.popup?.offsetHeight || 220;
-    // 内容比界面还高：限高到界面内（唯一的高度约束）
     if (this.popup) {
       this.popup.style.maxHeight =
         popupH > wsRect.height - 16 ? `${wsRect.height - 16}px` : "";
     }
 
-    // 默认放选区下方；底边越界则上移贴齐界面底
     let top = rect.bottom - wsRect.top + 8;
     if (top + popupH > wsRect.height - 8) {
-      top = Math.max(8, wsRect.height - popupH - 8);
+      top = Math.max(contentTop - wsRect.top, wsRect.height - popupH - 8);
     }
+    top = Math.max(contentTop - wsRect.top + 4, top);
+
     const left = rect.left - wsRect.left;
     return {
-      top: Math.max(8, top),
+      top,
       left: Math.max(8, Math.min(left, wsRect.width - 480)),
     };
   }
