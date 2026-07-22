@@ -3,9 +3,9 @@ import {
 } from "obsidian";
 import type { KuaifanyiSettings } from "./settings";
 import { DEFAULT_SETTINGS, API_PRESETS, ApiProvider } from "./settings";
-import { streamTranslate, streamExplain, streamDictLookup, fetchModels, fetchBalance, usageStats, isChinese, isWord } from "./translator";
-import { speak, stopSpeaking, getChineseVoices, VOLCANO_VOICES, volcanoUsage, VOLCANO_MONTHLY_QUOTA } from "./tts";
-import { fetchVolcanoBalance, fetchVolcanoUsage, lastSignDiag } from "./volc-billing";
+import { streamTranslate, streamExplain, streamDictLookup, fetchModels, fetchBalance, usageStats, isWord } from "./translator";
+import { speak, stopSpeaking, getChineseVoices, VOLCANO_VOICES, VOLCANO_MONTHLY_QUOTA } from "./tts";
+import { fetchVolcanoBalance, fetchVolcanoUsage } from "./volc-billing";
 
 const PROVIDERS: ApiProvider[] = ["deepseek", "custom"];
 
@@ -32,6 +32,8 @@ export default class KuaifanyiPlugin extends Plugin {
     this.addSettingTab(new KuaifanyiSettingTab(this.app, this));
 
     if (this.settings.apiKey) this.tryFetchModels();
+    // 启动时拉一次官方数据，避免显示落盘残留
+    void this.refreshBalance();
 
     const onScroll = () => {
       if (this.popup && !this.popupMoved) this.repositionPopup();
@@ -50,7 +52,7 @@ export default class KuaifanyiPlugin extends Plugin {
 
     this.addCommand({
       id: "speak-selection", name: "朗读选中文本",
-      editorCallback: (editor) => { const t = editor.getSelection(); if (t) { this.lastTrans = t; speak(t, this.settings); } },
+      editorCallback: (editor) => { const t = editor.getSelection(); if (t) { void speak(t, this.settings).then(() => this.updateUsage()); } },
     });
     this.addCommand({
       id: "translate-selection", name: "翻译选中文本",
@@ -83,7 +85,19 @@ export default class KuaifanyiPlugin extends Plugin {
     }
 
     if (this.settings.autoRead && !this.settings.autoTranslate) {
-      speak(text, this.settings);
+      void this.refreshBalance().then(() => this.updateUsage());
+      void speak(text, this.settings).then(() => {
+        this.updateUsage();
+        setTimeout(() => this.updateUsage(), 100);
+      });
+    }
+
+    if (this.settings.autoRead && !this.settings.autoTranslate) {
+      void this.refreshBalance().then(() => this.updateUsage());
+      void speak(text, this.settings).then(() => {
+        this.updateUsage();
+        setTimeout(() => this.updateUsage(), 100);
+      });
     }
   }
 
@@ -99,13 +113,18 @@ export default class KuaifanyiPlugin extends Plugin {
       const fn = useDict ? streamDictLookup : streamTranslate;
       promises.push(
         fn(text, this.settings, (chunk) => {
-          if (seq !== this.streamSeq) return; // 已被新请求取代
+          if (seq !== this.streamSeq) return;
           if (this.transEl) twTrans.update(this.transEl, chunk);
-        }).then((result) => {
+        }).then(async (result) => {
           if (seq !== this.streamSeq) return result;
           if (this.transEl) twTrans.finish(this.transEl, result);
           this.lastTrans = result;
-          if (this.settings.autoRead && result) speak(result, this.settings);
+          this.updateUsage();
+          void this.refreshBalance().then(() => this.updateUsage());
+          if (this.settings.autoRead && result) {
+            await speak(result, this.settings);
+            this.updateUsage();
+          }
           return result;
         })
       );
@@ -120,6 +139,8 @@ export default class KuaifanyiPlugin extends Plugin {
           if (seq !== this.streamSeq) return result;
           if (this.explEl) twExpl.finish(this.explEl, result);
           this.lastExpl = result;
+          this.updateUsage();
+          void this.refreshBalance().then(() => this.updateUsage());
           return result;
         })
       );
@@ -127,15 +148,16 @@ export default class KuaifanyiPlugin extends Plugin {
 
     await Promise.allSettled(promises);
     this.updateUsage();
-    await this.refreshBalance(); // 等余额返回后再更新一次
-    this.updateUsage();
-    await this.saveSettings(); // 持久化本月语音用量
   }
   // ---- 弹窗 ----
   private showPopup(range: Range, isDict: boolean): void {
     this.popupRange = range;
     this.popupMoved = false;
+    // stopSpeaking 在外层 hidePopup 调用，这里不重复
     this.removePopupDom();
+
+    // 中止旧流（新弹窗 → 旧 doStream 的 seq 不再匹配）
+    ++this.streamSeq;
 
     this.popup = this.app.workspace.containerEl.createDiv("kfy-popup");
     const pos = this.computePosition(range);
@@ -165,26 +187,26 @@ export default class KuaifanyiPlugin extends Plugin {
     const btnRow = this.popup.createDiv("kfy-btn-row");
     if (this.settings.autoTranslate) {
       const b = btnRow.createEl("button", { text: "🔊 读翻译" });
-      b.onclick = () => { if (this.lastTrans) speak(this.lastTrans, this.settings); };
+      b.onclick = () => { if (this.lastTrans) { void speak(this.lastTrans, this.settings).then(() => this.updateUsage()); } };
     }
     if (this.settings.autoExplain) {
       const b = btnRow.createEl("button", { text: "📢 读解释" });
-      b.onclick = () => { if (this.lastExpl) speak(this.lastExpl, this.settings); };
+      b.onclick = () => { if (this.lastExpl) { void speak(this.lastExpl, this.settings).then(() => this.updateUsage()); } };
     }
 
-    // 底部用量栏
     this.usageEl = this.popup.createDiv("kfy-usage");
-    this.updateUsage();
+    // 先拉官方数据再渲染
+    void this.refreshBalance().then(() => this.updateUsage());
   }
 
   private updateUsage(): void {
     if (!this.usageEl) return;
     this.usageEl.empty();
 
-    // 第一行：DeepSeek（token 消耗 + 余额）
+    // 第一行：DeepSeek（会话累计 token + 余额）
     const dsParts: string[] = [];
-    if (usageStats.last.total > 0) {
-      dsParts.push(`token ${usageStats.last.total}（入${usageStats.last.prompt}/出${usageStats.last.completion}）`);
+    if (usageStats.session.total > 0) {
+      dsParts.push(`token ${usageStats.session.total}（入${usageStats.session.prompt}/出${usageStats.session.completion}）`);
     }
     if (this.balanceText) dsParts.push(`余额 ${this.balanceText}`);
     if (dsParts.length > 0) {
@@ -192,39 +214,36 @@ export default class KuaifanyiPlugin extends Plugin {
       line1.textContent = `DeepSeek  ${dsParts.join("  ·  ")}`;
     }
 
-    // 第二行：语音合成（次数 · 字符/免费额度 · 余额）
+    // 第二行：语音合成（本地统计+官网实时+余额）
     if (this.settings.ttsEngine === "volcano") {
-      const s = this.settings;
-      const chars = (this.volcanoOfficialChars ?? s.volcanoMonthChars).toLocaleString();
+      const local = this.settings.volcanoMonthChars;
+      const api = this.volcanoOfficialChars;
+      const chars = api ? `${api.toLocaleString()} 字` : `${local.toLocaleString()} 字`;
       const vParts: string[] = [
-        `${s.volcanoMonthCalls} 次`,
-        `${chars} / ${VOLCANO_MONTHLY_QUOTA.toLocaleString()} 字（免费额度）`,
+        `${chars} / ${VOLCANO_MONTHLY_QUOTA.toLocaleString()} 字`,
       ];
-      if (this.volcanoBalanceText) vParts.push(`余额 ${this.volcanoBalanceText}`);
+      if (this.volcanoBalanceText) vParts.push(this.volcanoBalanceText);
       const line2 = this.usageEl.createDiv("kfy-usage-line");
       line2.textContent = `语音合成  ${vParts.join("  ·  ")}`;
     }
   }
 
   private async refreshBalance(): Promise<void> {
+    // DeepSeek 余额
     if (this.settings.apiKey) {
-      const b = await fetchBalance(this.settings);
-      if (b) { this.balanceText = b; }
+      try { const b = await fetchBalance(this.settings); if (b) { this.balanceText = b; } } catch {}
     }
+    // 火山余额 + 官方用量
     const { volcanoAccessKeyId, volcanoSecretAccessKey, volcanoAppId } = this.settings;
     if (volcanoAccessKeyId && volcanoSecretAccessKey) {
       try {
         const b = await fetchVolcanoBalance(volcanoAccessKeyId, volcanoSecretAccessKey);
-        this.volcanoBalanceText = `¥${b.toFixed(2)}`;
-      } catch (e: any) {
-        this.volcanoBalanceText = "¥—";
-        new Notice(`火山余额失败 [401] ${lastSignDiag}`, 12000);
-      }
-      // 官方用量（免费额度内可能为0，回退本地统计）
-      const now = new Date();
-      const start = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
-      const end = now.toISOString().slice(0, 10);
+        if (b !== null) { this.volcanoBalanceText = `余额 ¥${b.toFixed(2)}`; }
+      } catch {}
       try {
+        const d = new Date();
+        const start = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
+        const end = d.toISOString().slice(0, 10);
         const chars = await fetchVolcanoUsage(volcanoAccessKeyId, volcanoSecretAccessKey, volcanoAppId, start, end);
         if (chars !== null && chars > 0) { this.volcanoOfficialChars = chars; }
       } catch {}
@@ -238,7 +257,6 @@ export default class KuaifanyiPlugin extends Plugin {
   }
 
   private removePopupDom(): void {
-    stopSpeaking();
     if (this.popup) { this.popup.remove(); this.popup = null; }
     this.transEl = null;
     this.explEl = null;
@@ -331,11 +349,24 @@ export default class KuaifanyiPlugin extends Plugin {
 
   async loadSettings(): Promise<void> {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    // 清理历史残留字段（已从接口中移除的旧配置项）
+    let dirty = !!(this.settings as any).volcanoCluster || !!(this.settings as any).ttsBackend;
+    delete (this.settings as any).volcanoCluster;
+    delete (this.settings as any).ttsBackend;
+    delete (this.settings as any).targetLang;
+    delete (this.settings as any).systemPrompt;
     // 迁移：旧版无效音色 ID 自动纠正为默认
     if (this.settings.volcanoVoice === "zh_female_qingxin") {
       this.settings.volcanoVoice = DEFAULT_SETTINGS.volcanoVoice;
-      await this.saveSettings();
+      dirty ||= true;
     }
+    // 不持久化：启动时重置计数并清官方缓存
+    this.settings.volcanoMonth = "";
+    this.settings.volcanoMonthChars = 0;
+    this.settings.volcanoMonthCalls = 0;
+    this.volcanoOfficialChars = null;
+    // 一次性清理磁盘残留（仅当有脏字段时写一次）
+    if (dirty) await this.saveSettings();
   }
   async saveSettings(): Promise<void> { await this.saveData(this.settings); }
 }

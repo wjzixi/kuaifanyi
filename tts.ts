@@ -184,32 +184,33 @@ function pickBestWebVoice(settings: KuaifanyiSettings): SpeechSynthesisVoice | n
   return voices.find((v) => v.lang.startsWith("zh")) || null;
 }
 
-function webSpeak(text: string, settings: KuaifanyiSettings): void {
-  stopSpeaking();
-  const cleaned = cleanForSpeech(text);
-  if (!cleaned) return;
-  const phrases = cleaned.split(/(?<=[。！？.!?])/g).map((p) => p.trim()).filter(Boolean);
-  if (!phrases.length) return;
+function webSpeak(text: string, settings: KuaifanyiSettings): Promise<void> {
+  return new Promise((resolve) => {
+    stopSpeaking();
+    const cleaned = cleanForSpeech(text);
+    if (!cleaned) { resolve(); return; }
+    const phrases = cleaned.split(/(?<=[。！？.!?])/g).map((p) => p.trim()).filter(Boolean);
+    if (!phrases.length) { resolve(); return; }
 
-  const voice = pickBestWebVoice(settings);
-  if (!voice) {
-    new Notice("未找到可用语音，请检查系统语言包");
-    return;
-  }
-  const synth = window.speechSynthesis;
-  for (let i = 0; i < phrases.length; i++) {
-    const utt = new SpeechSynthesisUtterance(phrases[i]);
-    utt.voice = voice;
-    utt.rate = settings.ttsRate;
-    utt.pitch = settings.ttsPitch;
-    utt.volume = 1;
-    if (i < phrases.length - 1) {
-      utt.onend = () => setTimeout(() => playNext(synth), 120);
+    const voice = pickBestWebVoice(settings);
+    if (!voice) { new Notice("未找到可用语音，请检查系统语言包"); resolve(); return; }
+    const synth = window.speechSynthesis;
+    for (let i = 0; i < phrases.length; i++) {
+      const utt = new SpeechSynthesisUtterance(phrases[i]);
+      utt.voice = voice;
+      utt.rate = settings.ttsRate;
+      utt.pitch = settings.ttsPitch;
+      utt.volume = 1;
+      if (i === phrases.length - 1) {
+        utt.onend = () => { resolve(); speaking = false; };
+      } else {
+        utt.onend = () => setTimeout(() => playNext(synth), 120);
+      }
+      queue.push(utt);
     }
-    queue.push(utt);
-  }
-  speaking = true;
-  setTimeout(() => playNext(synth), 80);
+    speaking = true;
+    setTimeout(() => playNext(synth), 80);
+  });
 }
 
 function playNext(synth: SpeechSynthesis): void {
@@ -218,11 +219,11 @@ function playNext(synth: SpeechSynthesis): void {
 }
 
 // ============ 统一入口 ============
-export function speak(text: string, settings: KuaifanyiSettings): void {
+export function speak(text: string, settings: KuaifanyiSettings): Promise<void> {
   if (settings.ttsEngine === "volcano") {
-    void volcanoSpeak(text, settings);
+    return volcanoSpeak(text, settings);
   } else {
-    webSpeak(text, settings);
+    return webSpeak(text, settings);
   }
 }
 

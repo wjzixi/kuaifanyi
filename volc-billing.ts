@@ -1,4 +1,4 @@
-import { Notice, requestUrl } from "obsidian";
+import { requestUrl } from "obsidian";
 
 // 用 Node crypto（Electron 环境可用，与之前独立测试 200 通过的算法完全相同）
 import crypto from "crypto";
@@ -19,7 +19,6 @@ function hmacHex(key: any, data: string): string {
 
 // ---- 火山引擎 V4 签名 ----
 const ALGORITHM = "HMAC-SHA256";
-let lastSignDiag = "";
 
 function amzDates(): { short: string; full: string } {
   const d = new Date();
@@ -54,7 +53,7 @@ async function signedGet(
 
   const crHash = sha256Hex(canonicalRequest);
   const stsHash = sha256Hex(stringToSign);
-  lastSignDiag = `cr=${crHash.slice(0,10)} sts=${stsHash.slice(0,10)} sig=${signature.slice(0,10)}`;
+  console.debug("[volc signing]", { scope: credScope, crHash: crHash.slice(0, 12), stsHash: stsHash.slice(0, 12) });
 
   // fetch 优先，失败回退 requestUrl
   let status: number, json: any, err: string | undefined;
@@ -79,22 +78,23 @@ async function signedGet(
   return { status, json, err };
 }
 
-/** 查询火山账户余额（元），失败抛出错误 */
-export async function fetchVolcanoBalance(ak: string, sk: string): Promise<number> {
-  const result = await signedGet("billing.volcengineapi.com", "billing", "cn-beijing",
-    "Action=QueryBalanceAcct&Version=2022-01-01", ak, sk);
-  if (result.status !== 200 || !result.json) throw new Error(`[${result.status}] ${result.err || "余额查询失败"}`);
-  const r = result.json?.Result;
-  if (!r) throw new Error("余额数据缺失");
-  const v = parseFloat(r.AvailableBalance ?? r.CashBalance ?? "0");
-  if (isNaN(v)) throw new Error("余额格式异常");
-  return v;
+/** 查询火山账户余额（元），失败返回 null */
+export async function fetchVolcanoBalance(ak: string, sk: string): Promise<number | null> {
+  try {
+    const result = await signedGet("billing.volcengineapi.com", "billing", "cn-beijing",
+      "Action=QueryBalanceAcct&Version=2022-01-01", ak, sk);
+    if (result.status === 200 && result.json) {
+      const v = parseFloat(result.json?.Result?.AvailableBalance ?? result.json?.Result?.CashBalance ?? "0");
+      if (!isNaN(v)) return v;
+    }
+    return null;
+  } catch { return null; }
 }
 
 /** 查询本月语音合成大模型官方用量（字符），失败/无数据返回 null */
 export async function fetchVolcanoUsage(ak: string, sk: string, appId: string, start: string, end: string): Promise<number | null> {
   try {
-    const q = `Action=UsageMonitoring&AppID=${appId}&End=${end}&Mode=daily&ResourceID=volc.service_type.10029&Start=${start}&Version=2021-08-30`;
+    const q = `Action=UsageMonitoring&AppID=${appId}&End=${end}&Mode=daily&ResourceID=volc.seedtts.default&Start=${start}&Version=2021-08-30`;
     const result = await signedGet("open.volcengineapi.com", "speech_saas_prod", "cn-north-1", q, ak, sk);
     if (result.status !== 200 || !result.json || result.json?.status !== "success") return null;
     const um = result.json?.data?.usage_monitoring;
@@ -102,5 +102,3 @@ export async function fetchVolcanoUsage(ak: string, sk: string, appId: string, s
     return um.reduce((s: number, x: any) => s + (x.value || 0), 0);
   } catch { return null; }
 }
-
-export { lastSignDiag };
