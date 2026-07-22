@@ -30,7 +30,7 @@ async function signedGet(
   const payloadHash = await sha256Hex("");
   const signedHeaders = "content-type;host;x-content-sha256;x-date";
   const canonicalHeaders =
-    `content-type:application/x-www-form-urlencoded; charset=utf-8\n` +
+    `content-type:application/x-www-form-urlencoded\n` +
     `host:${host}\n` +
     `x-content-sha256:${payloadHash}\n` +
     `x-date:${full}\n`;
@@ -48,7 +48,7 @@ async function signedGet(
     url: `https://${host}/?${query}`,
     method: "GET",
     headers: {
-      "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
+      "Content-Type": "application/x-www-form-urlencoded",
       "X-Date": full,
       "X-Content-Sha256": payloadHash,
       Authorization: `${ALGORITHM} Credential=${ak}/${credScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`,
