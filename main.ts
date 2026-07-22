@@ -95,14 +95,6 @@ export default class KuaifanyiPlugin extends Plugin {
         setTimeout(() => this.updateUsage(), 100);
       });
     }
-
-    if (this.settings.autoRead && !this.settings.autoTranslate) {
-      void this.refreshBalance().then(() => this.updateUsage());
-      void speak(text, this.settings).then(() => {
-        this.updateUsage();
-        setTimeout(() => this.updateUsage(), 100);
-      });
-    }
   }
 
   private async doStream(text: string): Promise<void> {
@@ -588,6 +580,11 @@ class KuaifanyiSettingTab extends PluginSettingTab {
             .setValue(this.plugin.settings.volcanoSecretAccessKey)
             .onChange(async (v) => { this.plugin.settings.volcanoSecretAccessKey = v; await this.plugin.saveSettings(); });
         });
+
+      // 语音缓存
+      new Setting(containerEl).setName("启用语音缓存").setDesc("同一段文字不重复调用合成API，直接播放本地缓存")
+        .addToggle((tg) => tg.setValue(this.plugin.settings.ttsCacheEnabled)
+          .onChange(async (v) => { this.plugin.settings.ttsCacheEnabled = v; await this.plugin.saveSettings(); }));
     } else {
       const voices = getChineseVoices();
       if (voices.length > 0) {

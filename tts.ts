@@ -1,5 +1,8 @@
 import { Notice, requestUrl } from "obsidian";
 import type { KuaifanyiSettings } from "./settings";
+import crypto from "crypto";
+import fs from "fs";
+import path from "path";
 
 // ============ 火山豆包语音 ============
 const VOLCANO_TTS_URL = "https://openspeech.bytedance.com/api/v1/tts";
@@ -87,6 +90,52 @@ function uuid(): string {
   });
 }
 
+// ---- 语音缓存 ----
+const CACHE_DIR_NAME = "tts-cache";
+
+let _cacheDir = "";
+function ensureCacheDir(): string {
+  if (!_cacheDir) {
+    const vaultPath = (window as any).app?.vault?.adapter?.basePath;
+    if (vaultPath) {
+      _cacheDir = path.join(vaultPath, ".obsidian", "plugins", "kuaifanyi", CACHE_DIR_NAME);
+      if (!fs.existsSync(_cacheDir)) fs.mkdirSync(_cacheDir, { recursive: true });
+    }
+  }
+  return _cacheDir;
+}
+
+/** 生成缓存文件名: MD5(文本+音色) */
+function cacheName(text: string, voice: string): string {
+  const hash = crypto.createHash("md5").update(text).update(voice).digest("hex");
+  return path.join(ensureCacheDir(), hash + ".mp3");
+}
+
+/** 从缓存加载音频，成功返回 blob，失败返回 null */
+function loadFromCache(text: string, voice: string): Blob | null {
+  if (!text || !voice) return null;
+  const fp = cacheName(text, voice);
+  try {
+    if (fs.existsSync(fp)) {
+      const buf = fs.readFileSync(fp);
+      return new Blob([buf], { type: "audio/mp3" });
+    }
+  } catch {}
+  return null;
+}
+
+/** 保存音频到缓存 */
+function saveToCache(text: string, voice: string, blob: Blob): void {
+  if (!text || !voice || !blob) return;
+  try {
+    const fp = cacheName(text, voice);
+    // 异步转 arrayBuffer 写入
+    blob.arrayBuffer().then((buf) => {
+      fs.writeFileSync(fp, Buffer.from(buf));
+    }).catch(() => {});
+  } catch {}
+}
+
 /** 调用火山 TTS 合成一段文本，返回音频 blob */
 async function volcanoSynth(text: string, s: KuaifanyiSettings): Promise<Blob> {
   // cluster 自动推断：克隆音色(S_xxx)用 volcano_icl，否则 volcano_tts
@@ -148,9 +197,20 @@ async function volcanoSpeak(text: string, settings: KuaifanyiSettings): Promise<
   try {
     for (const chunk of chunks) {
       if (!speaking) break;
-      emitState("uploading");
-      const blob = await volcanoSynth(chunk, settings);
-      emitState("synthesizing");
+      let blob: Blob | null = null;
+
+      // 缓存命中：直接用，不调 API
+      if (settings.ttsCacheEnabled) {
+        blob = loadFromCache(chunk, settings.volcanoVoice);
+      }
+
+      if (!blob) {
+        emitState("uploading");
+        blob = await volcanoSynth(chunk, settings);
+        emitState("synthesizing");
+        // 写入缓存
+        if (settings.ttsCacheEnabled) saveToCache(chunk, settings.volcanoVoice, blob);
+      }
       volcanoUsage.chars += chunk.length;
       volcanoUsage.calls += 1;
       trackMonthly(settings, chunk.length);

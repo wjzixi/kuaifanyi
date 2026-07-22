@@ -37,6 +37,8 @@ export interface KuaifanyiSettings {
   // 火山计费（查余额，可选）
   volcanoAccessKeyId: string;
   volcanoSecretAccessKey: string;
+  // 语音缓存
+  ttsCacheEnabled: boolean;
   // 本月用量（自动维护，无需手填）
   volcanoMonth: string;
   volcanoMonthChars: number;
@@ -65,6 +67,7 @@ export const DEFAULT_SETTINGS: KuaifanyiSettings = {
   volcanoVoice: "zh_female_vv_uranus_bigtts",
   volcanoAccessKeyId: "",
   volcanoSecretAccessKey: "",
+  ttsCacheEnabled: true,
   volcanoMonth: "",
   volcanoMonthChars: 0,
   volcanoMonthCalls: 0,
