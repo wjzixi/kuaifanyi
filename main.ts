@@ -5,7 +5,7 @@ import type { KuaifanyiSettings } from "./settings";
 import { DEFAULT_SETTINGS, API_PRESETS, ApiProvider } from "./settings";
 import { streamTranslate, streamExplain, streamDictLookup, fetchModels, fetchBalance, usageStats, isWord } from "./translator";
 import { speak, stopSpeaking, getChineseVoices, VOLCANO_VOICES, VOLCANO_MONTHLY_QUOTA, setTtsStateCallback, TtsState, clearTtsCache } from "./tts";
-import { fetchVolcanoBalance, fetchVolcanoUsage } from "./volc-billing";
+import { fetchVolcanoBalance, fetchVolcanoUsage, fetchAliyunBalance } from "./volc-billing";
 
 const PROVIDERS: ApiProvider[] = ["deepseek", "qwen", "doubao", "kimi", "zhipu", "custom"];
 
@@ -205,7 +205,8 @@ export default class KuaifanyiPlugin extends Plugin {
     if (!this.usageEl) return;
     this.usageEl.empty();
 
-    // 第一行：API 用量（会话累计 token + 余额）
+    // 第一行：用量（提供商 token + 余额）
+    const providerName = API_PRESETS[this.settings.apiProvider]?.name || "API";
     const dsParts: string[] = [];
     if (usageStats.session.total > 0) {
       dsParts.push(`token ${usageStats.session.total}（入${usageStats.session.prompt}/出${usageStats.session.completion}）`);
@@ -213,7 +214,7 @@ export default class KuaifanyiPlugin extends Plugin {
     if (this.balanceText) dsParts.push(`余额 ${this.balanceText}`);
     if (dsParts.length > 0) {
       const line1 = this.usageEl.createDiv("kfy-usage-line");
-      line1.textContent = "API  " + dsParts.join("  ·  ");
+      line1.textContent = providerName + "  " + dsParts.join("  ·  ");
     }
 
     // 第二行：语音合成（本地统计+官网实时+余额）
@@ -231,23 +232,41 @@ export default class KuaifanyiPlugin extends Plugin {
   }
 
   private async refreshBalance(): Promise<void> {
-    // API 余额
+    // 按提供商查余额
+    const prov = this.settings.apiProvider;
     if (this.settings.apiKey) {
-      try { const b = await fetchBalance(this.settings); if (b) { this.balanceText = b; } } catch {}
+      try {
+        if (prov === "deepseek") {
+          const b = await fetchBalance(this.settings);
+          if (b) this.balanceText = b;
+        } else if (prov === "doubao") {
+          const { volcanoAccessKeyId, volcanoSecretAccessKey } = this.settings;
+          if (volcanoAccessKeyId && volcanoSecretAccessKey) {
+            const b = await fetchVolcanoBalance(volcanoAccessKeyId, volcanoSecretAccessKey);
+            if (b !== null) this.balanceText = `¥${b.toFixed(2)}`;
+          }
+        } else if (prov === "qwen") {
+          const { aliyunAccessKeyId, aliyunSecretAccessKey } = this.settings;
+          if (aliyunAccessKeyId && aliyunSecretAccessKey) {
+            const b = await fetchAliyunBalance(aliyunAccessKeyId, aliyunSecretAccessKey);
+            if (b !== null) this.balanceText = `¥${b.toFixed(2)}`;
+          }
+        }
+      } catch {}
     }
-    // 火山余额 + 官方用量
+    // 火山 TTS 余额 + 官方用量
     const { volcanoAccessKeyId, volcanoSecretAccessKey, volcanoAppId } = this.settings;
     if (volcanoAccessKeyId && volcanoSecretAccessKey) {
       try {
         const b = await fetchVolcanoBalance(volcanoAccessKeyId, volcanoSecretAccessKey);
-        if (b !== null) { this.volcanoBalanceText = `余额 ¥${b.toFixed(2)}`; }
+        if (b !== null) this.volcanoBalanceText = `余额 ¥${b.toFixed(2)}`;
       } catch {}
       try {
         const d = new Date();
         const start = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
         const end = d.toISOString().slice(0, 10);
         const chars = await fetchVolcanoUsage(volcanoAccessKeyId, volcanoSecretAccessKey, volcanoAppId, start, end);
-        if (chars !== null && chars > 0) { this.volcanoOfficialChars = chars; }
+        if (chars !== null && chars > 0) this.volcanoOfficialChars = chars;
       } catch {}
     }
   }
@@ -358,6 +377,16 @@ export default class KuaifanyiPlugin extends Plugin {
     try {
       const models = await fetchModels(this.settings);
       this.cachedModels[this.settings.apiProvider] = models;
+      // 智能推荐默认模型：已选的保留，默认的更新为最新
+      if (models.length > 0) {
+        const latest = models[models.length - 1];
+        if (!this.settings.translateModel || this.settings.translateModel === "deepseek-chat") {
+          this.settings.translateModel = latest;
+        }
+        if (!this.settings.explainModel || this.settings.explainModel === "deepseek-v4-flash") {
+          this.settings.explainModel = models.length > 1 ? models[models.length - 2] : latest;
+        }
+      }
     }
     catch { /* 静默失败 */ }
   }
@@ -451,6 +480,11 @@ class KuaifanyiSettingTab extends PluginSettingTab {
           // 自动填充新提供商的已缓存 Key
           const cached = this.plugin.settings.providerKeys[v];
           this.plugin.settings.apiKey = cached || "";
+          // 重置模型为默认（无 Key 不清空旧值，避免下次切回来丢失）
+          if (!cached) {
+            this.plugin.settings.translateModel = "";
+            this.plugin.settings.explainModel = "";
+          }
           await this.plugin.saveSettings();
           // 刷新模型列表（等 API 返回再刷新面板）
           if (this.plugin.settings.apiKey) {
@@ -499,8 +533,9 @@ class KuaifanyiSettingTab extends PluginSettingTab {
             .onChange(async (v) => { this.plugin.settings.explainModel = v; await this.plugin.saveSettings(); });
         });
     } else {
+      const defModel = API_PRESETS[this.plugin.settings.apiProvider]?.model || "";
       new Setting(containerEl).setName("翻译模型")
-        .addText((t) => t.setPlaceholder("deepseek-chat")
+        .addText((t) => t.setPlaceholder(defModel || "填入 Key 后自动获取")
           .setValue(this.plugin.settings.translateModel)
           .onChange(async (v) => { this.plugin.settings.translateModel = v; await this.plugin.saveSettings(); }));
       new Setting(containerEl).setName("解释模型")
@@ -601,6 +636,19 @@ class KuaifanyiSettingTab extends PluginSettingTab {
           t.setPlaceholder("SKxxxx")
             .setValue(this.plugin.settings.volcanoSecretAccessKey)
             .onChange(async (v) => { this.plugin.settings.volcanoSecretAccessKey = v; await this.plugin.saveSettings(); });
+        });
+
+      // 阿里云 AccessKey（可选，用于千问余额查询）
+      new Setting(containerEl).setName("阿里云 AccessKey ID（可选）").setDesc("用于千问余额查询，阿里云控制台「AccessKey管理」获取")
+        .addText((t) => t.setPlaceholder("LTAI5t...")
+          .setValue(this.plugin.settings.aliyunAccessKeyId)
+          .onChange(async (v) => { this.plugin.settings.aliyunAccessKeyId = v; await this.plugin.saveSettings(); }));
+      new Setting(containerEl).setName("阿里云 AccessKey Secret（可选）").setDesc("同上，仅本地存储")
+        .addText((t) => {
+          t.inputEl.type = "password";
+          t.setPlaceholder("...")
+            .setValue(this.plugin.settings.aliyunSecretAccessKey)
+            .onChange(async (v) => { this.plugin.settings.aliyunSecretAccessKey = v; await this.plugin.saveSettings(); });
         });
 
       // 语音缓存

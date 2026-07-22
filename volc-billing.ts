@@ -102,3 +102,29 @@ export async function fetchVolcanoUsage(ak: string, sk: string, appId: string, s
     return um.reduce((s: number, x: any) => s + (x.value || 0), 0);
   } catch { return null; }
 }
+
+// ---- 阿里云 BSS 余额查询 ----
+function aliyunSign(params: Record<string, string>, method: string, sk: string): string {
+  const sortedKeys = Object.keys(params).sort();
+  const canonQuery = sortedKeys.map(k => encodeURIComponent(k) + "=" + encodeURIComponent(params[k])).join("&");
+  const stringToSign = method + "&" + encodeURIComponent("/") + "&" + encodeURIComponent(canonQuery);
+  const hmac = crypto.createHmac("sha1", sk + "&");
+  const sig = hmac.update(stringToSign, "utf-8").digest("base64");
+  return canonQuery + "&Signature=" + encodeURIComponent(sig);
+}
+
+export async function fetchAliyunBalance(ak: string, sk: string): Promise<number | null> {
+  try {
+    const params: Record<string, string> = {
+      Action: "QueryAccountBalance", Version: "2017-12-14",
+      AccessKeyId: ak, SignatureMethod: "HMAC-SHA1", SignatureVersion: "1.0",
+      Timestamp: new Date().toISOString().replace(/\.\d{3}Z$/, "Z"),
+      Format: "JSON", SignatureNonce: crypto.randomUUID(),
+    };
+    const query = aliyunSign(params, "GET", sk);
+    const resp = await requestUrl({ url: "https://business.aliyuncs.com/?" + query, method: "GET", throw: false });
+    if (resp.status !== 200) return null;
+    const v = parseFloat(resp.json?.Data?.AvailableAmount || "0");
+    return isNaN(v) ? null : v;
+  } catch { return null; }
+}

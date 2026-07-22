@@ -42,6 +42,9 @@ export interface KuaifanyiSettings {
   // 火山计费（查余额，可选）
   volcanoAccessKeyId: string;
   volcanoSecretAccessKey: string;
+  // 阿里云计费（查余额，可选）
+  aliyunAccessKeyId: string;
+  aliyunSecretAccessKey: string;
   // 语音缓存
   ttsCacheEnabled: boolean;
   ttsCacheDir: string;
@@ -74,6 +77,8 @@ export const DEFAULT_SETTINGS: KuaifanyiSettings = {
   volcanoVoice: "zh_female_vv_uranus_bigtts",
   volcanoAccessKeyId: "",
   volcanoSecretAccessKey: "",
+  aliyunAccessKeyId: "",
+  aliyunSecretAccessKey: "",
   ttsCacheEnabled: true,
   ttsCacheDir: "",
   volcanoMonth: "",
