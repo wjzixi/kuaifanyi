@@ -40,6 +40,7 @@ export interface KuaifanyiSettings {
   // 本月用量（自动维护，无需手填）
   volcanoMonth: string;
   volcanoMonthChars: number;
+  volcanoMonthCalls: number;
 }
 
 export const DEFAULT_SETTINGS: KuaifanyiSettings = {
@@ -66,4 +67,5 @@ export const DEFAULT_SETTINGS: KuaifanyiSettings = {
   volcanoSecretAccessKey: "",
   volcanoMonth: "",
   volcanoMonthChars: 0,
+  volcanoMonthCalls: 0,
 };

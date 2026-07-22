@@ -39,6 +39,7 @@ export function trackMonthly(s: KuaifanyiSettings, chars: number): number {
     s.volcanoMonthChars = 0;
   }
   s.volcanoMonthChars += chars;
+  s.volcanoMonthCalls += 1;
   return s.volcanoMonthChars;
 }
 

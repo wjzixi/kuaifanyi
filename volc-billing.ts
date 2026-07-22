@@ -1,9 +1,6 @@
 import { requestUrl } from "obsidian";
 
-// ---- 火山引擎 V4 签名（billing 服务，查账户余额） ----
-const SERVICE = "billing";
-const REGION = "cn-beijing";
-const HOST = "billing.volcengineapi.com";
+// ---- 火山引擎 V4 签名（对齐官方 SDK：SK 直接派生，不加前缀） ----
 const ALGORITHM = "HMAC-SHA256";
 
 async function sha256Hex(data: string | ArrayBuffer): Promise<string> {
@@ -22,59 +19,74 @@ function amzDates(): { short: string; full: string } {
   const d = new Date();
   const p = (n: number) => String(n).padStart(2, "0");
   const short = `${d.getUTCFullYear()}${p(d.getUTCMonth() + 1)}${p(d.getUTCDate())}`;
-  const full = `${short}T${p(d.getUTCHours())}${p(d.getUTCMinutes())}${p(d.getUTCSeconds())}Z`;
-  return { short, full };
+  return { short, full: `${short}T${p(d.getUTCHours())}${p(d.getUTCMinutes())}${p(d.getUTCSeconds())}Z` };
 }
 
-/** 查询火山账户余额，返回数字（元）或 null */
+async function signedGet(
+  host: string, service: string, region: string,
+  query: string, ak: string, sk: string
+): Promise<any | null> {
+  const { short, full } = amzDates();
+  const payloadHash = await sha256Hex("");
+  const signedHeaders = "content-type;host;x-content-sha256;x-date";
+  const canonicalHeaders =
+    `content-type:application/x-www-form-urlencoded; charset=utf-8\n` +
+    `host:${host}\n` +
+    `x-content-sha256:${payloadHash}\n` +
+    `x-date:${full}\n`;
+  const canonicalRequest = ["GET", "/", query, canonicalHeaders, signedHeaders, payloadHash].join("\n");
+  const credScope = `${short}/${region}/${service}/request`;
+  const stringToSign = [ALGORITHM, full, credScope, await sha256Hex(canonicalRequest)].join("\n");
+
+  const kDate = await hmac(sk, short);
+  const kRegion = await hmac(kDate, region);
+  const kService = await hmac(kRegion, service);
+  const kSigning = await hmac(kService, "request");
+  const signature = await sha256Hex(await hmac(kSigning, stringToSign));
+
+  const resp = await requestUrl({
+    url: `https://${host}/?${query}`,
+    method: "GET",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
+      "X-Date": full,
+      "X-Content-Sha256": payloadHash,
+      Authorization: `${ALGORITHM} Credential=${ak}/${credScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`,
+    },
+    throw: false,
+  });
+  if (resp.status !== 200) return null;
+  return resp.json;
+}
+
+/** 查询火山账户余额（元），失败返回 null */
 export async function fetchVolcanoBalance(ak: string, sk: string): Promise<number | null> {
-  if (!ak || !sk) return null;
   try {
-    const { short, full } = amzDates();
-    const query = "Action=QueryBalanceAcct&Version=2022-01-01";
-    const payloadHash = await sha256Hex("");
+    const data = await signedGet(
+      "billing.volcengineapi.com", "billing", "cn-beijing",
+      "Action=QueryBalanceAcct&Version=2022-01-01", ak, sk
+    );
+    const r = data?.Result;
+    if (!r) return null;
+    const v = parseFloat(r.AvailableBalance ?? r.CashBalance ?? "0");
+    return isNaN(v) ? null : v;
+  } catch { return null; }
+}
 
-    const signedHeaders = "content-type;host;x-content-sha256;x-date";
-    const canonicalHeaders =
-      `content-type:application/x-www-form-urlencoded; charset=utf-8\n` +
-      `host:${HOST}\n` +
-      `x-content-sha256:${payloadHash}\n` +
-      `x-date:${full}\n`;
-
-    const canonicalRequest = ["GET", "/", query, canonicalHeaders, signedHeaders, payloadHash].join("\n");
-    const credScope = `${short}/${REGION}/${SERVICE}/request`;
-    const stringToSign = [ALGORITHM, full, credScope, await sha256Hex(canonicalRequest)].join("\n");
-
-    const kDate = await hmac("Volc" + sk, short);
-    const kRegion = await hmac(kDate, REGION);
-    const kService = await hmac(kRegion, SERVICE);
-    const kSigning = await hmac(kService, "request");
-    const signature = await sha256Hex(await hmac(kSigning, stringToSign));
-
-    const resp = await requestUrl({
-      url: `https://${HOST}/?${query}`,
-      method: "GET",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
-        "X-Date": full,
-        "X-Content-Sha256": payloadHash,
-        Authorization: `${ALGORITHM} Credential=${ak}/${credScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`,
-      },
-      throw: false,
-    });
-    if (resp.status !== 200) return null;
-
-    // 兼容多种返回结构
-    const result = resp.json?.Result;
-    const infos = result?.BalanceInfos;
-    if (Array.isArray(infos) && infos.length > 0) {
-      const b = infos[0];
-      const val = b.Balance ?? b.CashBalance ?? b.AvailableBalance;
-      if (typeof val === "number") return val;
-    }
-    if (typeof result?.Balance === "number") return result.Balance;
-    return null;
-  } catch {
-    return null;
-  }
+/** 查询本月语音合成大模型官方用量（字符），失败/无数据返回 null */
+export async function fetchVolcanoUsage(
+  ak: string, sk: string, appId: string, start: string, end: string
+): Promise<number | null> {
+  try {
+    const q =
+      `Action=UsageMonitoring&AppID=${appId}&End=${end}&Mode=daily` +
+      `&ResourceID=volc.service_type.10029&Start=${start}&Version=2021-08-30`;
+    const data = await signedGet(
+      "open.volcengineapi.com", "speech_saas_prod", "cn-north-1", q, ak, sk
+    );
+    if (data?.status !== "success") return null;
+    const um = data?.data?.usage_monitoring;
+    if (!Array.isArray(um)) return null;
+    return um.reduce((sum: number, x: any) => sum + (x.value || 0), 0);
+  } catch { return null; }
 }

@@ -5,7 +5,7 @@ import type { KuaifanyiSettings } from "./settings";
 import { DEFAULT_SETTINGS, API_PRESETS, ApiProvider } from "./settings";
 import { streamTranslate, streamExplain, streamDictLookup, fetchModels, fetchBalance, usageStats, isChinese, isWord } from "./translator";
 import { speak, stopSpeaking, getChineseVoices, VOLCANO_VOICES, volcanoUsage, VOLCANO_MONTHLY_QUOTA } from "./tts";
-import { fetchVolcanoBalance } from "./volc-billing";
+import { fetchVolcanoBalance, fetchVolcanoUsage } from "./volc-billing";
 
 const PROVIDERS: ApiProvider[] = ["deepseek", "custom"];
 
@@ -25,6 +25,7 @@ export default class KuaifanyiPlugin extends Plugin {
   private usageEl: HTMLElement | null = null;
   private balanceText = "";
   private volcanoBalanceText = "";
+  private volcanoOfficialChars: number | null = null;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -190,10 +191,14 @@ export default class KuaifanyiPlugin extends Plugin {
       line1.textContent = `DeepSeek  ${dsParts.join("  ·  ")}`;
     }
 
-    // 第二行：语音合成（本月用量 / 免费额度 · 余额）
+    // 第二行：语音合成（次数 · 字符/免费额度 · 余额）
     if (this.settings.ttsEngine === "volcano") {
-      const vParts: string[] = [];
-      vParts.push(`${this.settings.volcanoMonthChars.toLocaleString()} / ${VOLCANO_MONTHLY_QUOTA.toLocaleString()} 字（本月免费额度）`);
+      const s = this.settings;
+      const chars = (this.volcanoOfficialChars ?? s.volcanoMonthChars).toLocaleString();
+      const vParts: string[] = [
+        `${s.volcanoMonthCalls} 次`,
+        `${chars} / ${VOLCANO_MONTHLY_QUOTA.toLocaleString()} 字（免费额度）`,
+      ];
       if (this.volcanoBalanceText) vParts.push(`余额 ${this.volcanoBalanceText}`);
       const line2 = this.usageEl.createDiv("kfy-usage-line");
       line2.textContent = `语音合成  ${vParts.join("  ·  ")}`;
@@ -206,10 +211,17 @@ export default class KuaifanyiPlugin extends Plugin {
         if (b) { this.balanceText = b; this.updateUsage(); }
       });
     }
-    const { volcanoAccessKeyId, volcanoSecretAccessKey } = this.settings;
+    const { volcanoAccessKeyId, volcanoSecretAccessKey, volcanoAppId } = this.settings;
     if (volcanoAccessKeyId && volcanoSecretAccessKey) {
       void fetchVolcanoBalance(volcanoAccessKeyId, volcanoSecretAccessKey).then((b) => {
         if (b !== null) { this.volcanoBalanceText = `¥${b.toFixed(2)}`; this.updateUsage(); }
+      });
+      // 官方用量（免费额度内可能为0，回退本地统计）
+      const now = new Date();
+      const start = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
+      const end = now.toISOString().slice(0, 10);
+      void fetchVolcanoUsage(volcanoAccessKeyId, volcanoSecretAccessKey, volcanoAppId, start, end).then((chars) => {
+        if (chars !== null && chars > 0) { this.volcanoOfficialChars = chars; this.updateUsage(); }
       });
     }
   }
