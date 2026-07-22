@@ -25,10 +25,9 @@ function amzDates(): { short: string; full: string } {
 async function signedGet(
   host: string, service: string, region: string,
   query: string, ak: string, sk: string
-): Promise<any | null> {
+): Promise<{ status: number; json: any; err?: string }> {
   const { short, full } = amzDates();
   const payloadHash = await sha256Hex("");
-  // GET 请求不签 Content-Type（Electron 网络栈会自动处理，签了反而可能被剥离导致不匹配）
   const signedHeaders = "host;x-content-sha256;x-date";
   const canonicalHeaders =
     `host:${host}\n` +
@@ -37,7 +36,6 @@ async function signedGet(
   const canonicalRequest = ["GET", "/", query, canonicalHeaders, signedHeaders, payloadHash].join("\n");
   const credScope = `${short}/${region}/${service}/request`;
   const stringToSign = [ALGORITHM, full, credScope, await sha256Hex(canonicalRequest)].join("\n");
-
   const kDate = await hmac(sk, short);
   const kRegion = await hmac(kDate, region);
   const kService = await hmac(kRegion, service);
@@ -54,18 +52,22 @@ async function signedGet(
     },
     throw: false,
   });
-  if (resp.status !== 200) return null;
-  return resp.json;
+  const json = resp.status === 200 ? resp.json : null;
+  return { status: resp.status, json, err: resp.status !== 200 ? (json?.ResponseMetadata?.Error?.Message || resp.text?.slice(0, 200)) : undefined };
 }
 
-/** 查询火山账户余额（元），失败返回 null */
+/** 查询火山账户余额（元），失败返回 null，同时用 Notice 报告错误码 */
 export async function fetchVolcanoBalance(ak: string, sk: string): Promise<number | null> {
   try {
-    const data = await signedGet(
+    const result = await signedGet(
       "billing.volcengineapi.com", "billing", "cn-beijing",
       "Action=QueryBalanceAcct&Version=2022-01-01", ak, sk
     );
-    const r = data?.Result;
+    if (result.status !== 200 || !result.json) {
+      console.error("火山余额查询失败", result.status, result.err);
+      return null;
+    }
+    const r = result.json?.Result;
     if (!r) return null;
     const v = parseFloat(r.AvailableBalance ?? r.CashBalance ?? "0");
     return isNaN(v) ? null : v;
@@ -80,11 +82,12 @@ export async function fetchVolcanoUsage(
     const q =
       `Action=UsageMonitoring&AppID=${appId}&End=${end}&Mode=daily` +
       `&ResourceID=volc.service_type.10029&Start=${start}&Version=2021-08-30`;
-    const data = await signedGet(
+    const result = await signedGet(
       "open.volcengineapi.com", "speech_saas_prod", "cn-north-1", q, ak, sk
     );
-    if (data?.status !== "success") return null;
-    const um = data?.data?.usage_monitoring;
+    if (result.status !== 200 || !result.json) return null;
+    if (result.json?.status !== "success") return null;
+    const um = result.json?.data?.usage_monitoring;
     if (!Array.isArray(um)) return null;
     return um.reduce((sum: number, x: any) => sum + (x.value || 0), 0);
   } catch { return null; }

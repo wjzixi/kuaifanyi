@@ -218,10 +218,12 @@ export default class KuaifanyiPlugin extends Plugin {
         if (b !== null) {
           this.volcanoBalanceText = `¥${b.toFixed(2)}`;
         } else {
-          this.volcanoBalanceText = "¥—"; // 查询失败兜底
+          this.volcanoBalanceText = "¥—";
+          new Notice("火山余额查询失败（签名/网络），已显示 ¥—", 5000);
         }
       } catch {
         this.volcanoBalanceText = "¥—";
+        new Notice("火山余额查询异常", 5000);
       }
       // 官方用量（免费额度内可能为0，回退本地统计）
       const now = new Date();
