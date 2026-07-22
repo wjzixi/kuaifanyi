@@ -43,6 +43,17 @@ npm run build  # 生产构建
 
 技术栈：TypeScript + esbuild + Obsidian API（requestUrl / SSE 流式 / Web Speech / 火山 TTS HTTP API）
 
+## ☕ 赞助
+
+如果这个项目对你有帮助，欢迎自由赞助（**最低 ¥5**，心意不分多少）：
+
+<table>
+  <tr>
+    <td align="center"><img src="assets/sponsor-wechat.png" width="220" alt="微信收款码"><br><b>微信支付</b></td>
+    <td align="center"><img src="assets/sponsor-alipay.jpg" width="220" alt="支付宝收款码"><br><b>支付宝</b></td>
+  </tr>
+</table>
+
 ## License
 
 MIT
