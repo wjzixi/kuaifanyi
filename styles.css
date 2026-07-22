@@ -63,6 +63,28 @@
   gap: var(--size-4-2);
   justify-content: flex-end;
   margin-top: var(--size-4-2);
+  align-items: center;
+}
+
+/* TTS 状态指示灯 + 文字（按钮左侧） */
+.kfy-tts-indicator-wrap {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-right: auto;
+}
+
+.kfy-tts-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #888;
+  flex-shrink: 0;
+}
+
+.kfy-tts-indicator-text {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
 }
 
 .kfy-btn-row button {

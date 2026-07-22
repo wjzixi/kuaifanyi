@@ -4,7 +4,7 @@ import {
 import type { KuaifanyiSettings } from "./settings";
 import { DEFAULT_SETTINGS, API_PRESETS, ApiProvider } from "./settings";
 import { streamTranslate, streamExplain, streamDictLookup, fetchModels, fetchBalance, usageStats, isWord } from "./translator";
-import { speak, stopSpeaking, getChineseVoices, VOLCANO_VOICES, VOLCANO_MONTHLY_QUOTA } from "./tts";
+import { speak, stopSpeaking, getChineseVoices, VOLCANO_VOICES, VOLCANO_MONTHLY_QUOTA, setTtsStateCallback, TtsState } from "./tts";
 import { fetchVolcanoBalance, fetchVolcanoUsage } from "./volc-billing";
 
 const PROVIDERS: ApiProvider[] = ["deepseek", "custom"];
@@ -23,6 +23,7 @@ export default class KuaifanyiPlugin extends Plugin {
   private followFrame: number | null = null;
   private streamSeq = 0; // 流式请求序号，用于竞态中止
   private usageEl: HTMLElement | null = null;
+  private ttsIndicator: HTMLElement | null = null;
   private balanceText = "";
   private volcanoBalanceText = "";
   private volcanoOfficialChars: number | null = null;
@@ -30,6 +31,9 @@ export default class KuaifanyiPlugin extends Plugin {
   async onload(): Promise<void> {
     await this.loadSettings();
     this.addSettingTab(new KuaifanyiSettingTab(this.app, this));
+
+    // TTS 状态回调
+    setTtsStateCallback((s) => this.setTtsState(s));
 
     if (this.settings.apiKey) this.tryFetchModels();
     // 启动时拉一次官方数据，避免显示落盘残留
@@ -185,6 +189,12 @@ export default class KuaifanyiPlugin extends Plugin {
     } else { this.explEl = null; }
 
     const btnRow = this.popup.createDiv("kfy-btn-row");
+    // TTS 状态指示灯 + 文字
+    const indWrap = btnRow.createSpan("kfy-tts-indicator-wrap");
+    this.ttsIndicator = indWrap.createSpan("kfy-tts-indicator");
+    const indText = indWrap.createSpan("kfy-tts-indicator-text");
+    indText.textContent = "空闲";
+    (this as any)._ttsText = indText;
     if (this.settings.autoTranslate) {
       const b = btnRow.createEl("button", { text: "🔊 读翻译" });
       b.onclick = () => { if (this.lastTrans) { void speak(this.lastTrans, this.settings).then(() => this.updateUsage()); } };
@@ -256,11 +266,21 @@ export default class KuaifanyiPlugin extends Plugin {
     this.removePopupDom();
   }
 
+  private setTtsState(state: TtsState): void {
+    if (!this.ttsIndicator) return;
+    const colors: Record<TtsState, string> = { idle: "#888", uploading: "#f0a020", synthesizing: "#2080d0", reading: "#20b050" };
+    const labels: Record<TtsState, string> = { idle: "空闲", uploading: "上传", synthesizing: "合成", reading: "朗读" };
+    this.ttsIndicator.style.backgroundColor = colors[state];
+    const txt = (this as any)._ttsText as HTMLElement;
+    if (txt) txt.textContent = labels[state];
+  }
+
   private removePopupDom(): void {
     if (this.popup) { this.popup.remove(); this.popup = null; }
     this.transEl = null;
     this.explEl = null;
     this.usageEl = null;
+    this.ttsIndicator = null;
     if (this.followFrame !== null) { cancelAnimationFrame(this.followFrame); this.followFrame = null; }
   }
 

@@ -31,6 +31,16 @@ export const volcanoUsage = { chars: 0, calls: 0 };
 /** 本月免费额度（大模型语音合成：2万字符/月） */
 export const VOLCANO_MONTHLY_QUOTA = 20000;
 
+// ---- TTS 状态回调 ----
+export type TtsState = "idle" | "uploading" | "synthesizing" | "reading";
+let onStateChange: ((s: TtsState) => void) | null = null;
+export function setTtsStateCallback(fn: ((s: TtsState) => void) | null): void {
+  onStateChange = fn;
+}
+function emitState(s: TtsState): void {
+  if (onStateChange) onStateChange(s);
+}
+
 /** 记录用量到设置（跨月自动清零），返回当月累计 */
 export function trackMonthly(s: KuaifanyiSettings, chars: number): number {
   const nowMonth = new Date().toISOString().slice(0, 7); // "2026-07"
@@ -137,17 +147,21 @@ async function volcanoSpeak(text: string, settings: KuaifanyiSettings): Promise<
   speaking = true;
   try {
     for (const chunk of chunks) {
-      if (!speaking) break; // 被中止
+      if (!speaking) break;
+      emitState("uploading");
       const blob = await volcanoSynth(chunk, settings);
+      emitState("synthesizing");
       volcanoUsage.chars += chunk.length;
       volcanoUsage.calls += 1;
       trackMonthly(settings, chunk.length);
       if (!speaking) break;
+      emitState("reading");
       await playBlob(blob);
     }
   } catch (e: any) {
     new Notice(`豆包语音失败: ${e.message}`);
   }
+  emitState("idle");
   speaking = false;
 }
 
@@ -214,7 +228,7 @@ function webSpeak(text: string, settings: KuaifanyiSettings): Promise<void> {
 }
 
 function playNext(synth: SpeechSynthesis): void {
-  if (!queue.length) { speaking = false; return; }
+  if (!queue.length) { speaking = false; emitState("idle"); return; }
   synth.speak(queue.shift()!);
 }
 
@@ -229,6 +243,7 @@ export function speak(text: string, settings: KuaifanyiSettings): Promise<void> 
 
 export function stopSpeaking(): void {
   speaking = false;
+  emitState("idle");
   window.speechSynthesis.cancel();
   queue = [];
   if (currentAudio) {
