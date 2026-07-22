@@ -4,10 +4,10 @@ import {
 import type { KuaifanyiSettings } from "./settings";
 import { DEFAULT_SETTINGS, API_PRESETS, ApiProvider } from "./settings";
 import { streamTranslate, streamExplain, streamDictLookup, fetchModels, fetchBalance, usageStats, isWord } from "./translator";
-import { speak, stopSpeaking, getChineseVoices, VOLCANO_VOICES, VOLCANO_MONTHLY_QUOTA, setTtsStateCallback, TtsState } from "./tts";
+import { speak, stopSpeaking, getChineseVoices, VOLCANO_VOICES, VOLCANO_MONTHLY_QUOTA, setTtsStateCallback, TtsState, clearTtsCache } from "./tts";
 import { fetchVolcanoBalance, fetchVolcanoUsage } from "./volc-billing";
 
-const PROVIDERS: ApiProvider[] = ["deepseek", "custom"];
+const PROVIDERS: ApiProvider[] = ["deepseek", "qwen", "doubao", "kimi", "zhipu", "custom"];
 
 export default class KuaifanyiPlugin extends Plugin {
   settings!: KuaifanyiSettings;
@@ -24,6 +24,7 @@ export default class KuaifanyiPlugin extends Plugin {
   private streamSeq = 0; // 流式请求序号，用于竞态中止
   private usageEl: HTMLElement | null = null;
   private ttsIndicator: HTMLElement | null = null;
+  private ttsIndicatorText: HTMLElement | null = null;
   private balanceText = "";
   private volcanoBalanceText = "";
   private volcanoOfficialChars: number | null = null;
@@ -184,9 +185,8 @@ export default class KuaifanyiPlugin extends Plugin {
     // TTS 状态指示灯 + 文字
     const indWrap = btnRow.createSpan("kfy-tts-indicator-wrap");
     this.ttsIndicator = indWrap.createSpan("kfy-tts-indicator");
-    const indText = indWrap.createSpan("kfy-tts-indicator-text");
-    indText.textContent = "空闲";
-    (this as any)._ttsText = indText;
+    this.ttsIndicatorText = indWrap.createSpan("kfy-tts-indicator-text");
+    this.ttsIndicatorText.textContent = "空闲";
     if (this.settings.autoTranslate) {
       const b = btnRow.createEl("button", { text: "🔊 读翻译" });
       b.onclick = () => { if (this.lastTrans) { void speak(this.lastTrans, this.settings).then(() => this.updateUsage()); } };
@@ -263,8 +263,7 @@ export default class KuaifanyiPlugin extends Plugin {
     const colors: Record<TtsState, string> = { idle: "#888", uploading: "#f0a020", synthesizing: "#2080d0", reading: "#20b050" };
     const labels: Record<TtsState, string> = { idle: "空闲", uploading: "上传", synthesizing: "合成", reading: "朗读" };
     this.ttsIndicator.style.backgroundColor = colors[state];
-    const txt = (this as any)._ttsText as HTMLElement;
-    if (txt) txt.textContent = labels[state];
+    if (this.ttsIndicatorText) this.ttsIndicatorText.textContent = labels[state];
   }
 
   private removePopupDom(): void {
@@ -273,6 +272,7 @@ export default class KuaifanyiPlugin extends Plugin {
     this.explEl = null;
     this.usageEl = null;
     this.ttsIndicator = null;
+    this.ttsIndicatorText = null;
     if (this.followFrame !== null) { cancelAnimationFrame(this.followFrame); this.followFrame = null; }
   }
 
@@ -585,6 +585,19 @@ class KuaifanyiSettingTab extends PluginSettingTab {
       new Setting(containerEl).setName("启用语音缓存").setDesc("同一段文字不重复调用合成API，直接播放本地缓存")
         .addToggle((tg) => tg.setValue(this.plugin.settings.ttsCacheEnabled)
           .onChange(async (v) => { this.plugin.settings.ttsCacheEnabled = v; await this.plugin.saveSettings(); }));
+
+      const defaultCacheDir = (process.env.USERPROFILE || process.env.HOME || ".") + "\\kuaifanyi-tts-cache";
+      new Setting(containerEl).setName("缓存目录").setDesc(`存放音频文件，默认 ${defaultCacheDir}`)
+        .addText((t) => t.setPlaceholder(defaultCacheDir)
+          .setValue(this.plugin.settings.ttsCacheDir)
+          .onChange(async (v) => { this.plugin.settings.ttsCacheDir = v; await this.plugin.saveSettings(); }));
+
+      new Setting(containerEl).setName("清除语音缓存").setDesc("删除所有已缓存的语音文件")
+        .addButton((btn) => btn.setButtonText("立即清除").onClick(() => {
+          const dir = this.plugin.settings.ttsCacheDir || defaultCacheDir;
+          const count = clearTtsCache(dir);
+          new Notice(`已清除 ${count} 个缓存文件`);
+        }));
     } else {
       const voices = getChineseVoices();
       if (voices.length > 0) {

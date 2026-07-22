@@ -91,30 +91,29 @@ function uuid(): string {
 }
 
 // ---- 语音缓存 ----
-const CACHE_DIR_NAME = "tts-cache";
 
-let _cacheDir = "";
-function ensureCacheDir(): string {
-  if (!_cacheDir) {
-    const vaultPath = (window as any).app?.vault?.adapter?.basePath;
-    if (vaultPath) {
-      _cacheDir = path.join(vaultPath, ".obsidian", "plugins", "kuaifanyi", CACHE_DIR_NAME);
-      if (!fs.existsSync(_cacheDir)) fs.mkdirSync(_cacheDir, { recursive: true });
-    }
-  }
-  return _cacheDir;
+function resolveCacheDir(settings: KuaifanyiSettings): string {
+  if (settings.ttsCacheDir) return settings.ttsCacheDir;
+  // 默认用户目录下
+  const home = process.env.USERPROFILE || process.env.HOME || ".";
+  return path.join(home, "kuaifanyi-tts-cache");
+}
+
+function ensureCacheDir(dir: string): string {
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  return dir;
 }
 
 /** 生成缓存文件名: MD5(文本+音色) */
-function cacheName(text: string, voice: string): string {
+function cacheName(text: string, voice: string, dir: string): string {
   const hash = crypto.createHash("md5").update(text).update(voice).digest("hex");
-  return path.join(ensureCacheDir(), hash + ".mp3");
+  return path.join(dir, hash + ".mp3");
 }
 
 /** 从缓存加载音频，成功返回 blob，失败返回 null */
-function loadFromCache(text: string, voice: string): Blob | null {
+function loadFromCache(text: string, voice: string, dir: string): Blob | null {
   if (!text || !voice) return null;
-  const fp = cacheName(text, voice);
+  const fp = cacheName(text, voice, dir);
   try {
     if (fs.existsSync(fp)) {
       const buf = fs.readFileSync(fp);
@@ -125,15 +124,30 @@ function loadFromCache(text: string, voice: string): Blob | null {
 }
 
 /** 保存音频到缓存 */
-function saveToCache(text: string, voice: string, blob: Blob): void {
+function saveToCache(text: string, voice: string, blob: Blob, dir: string): void {
   if (!text || !voice || !blob) return;
   try {
-    const fp = cacheName(text, voice);
-    // 异步转 arrayBuffer 写入
+    const fp = cacheName(text, voice, dir);
     blob.arrayBuffer().then((buf) => {
       fs.writeFileSync(fp, Buffer.from(buf));
     }).catch(() => {});
   } catch {}
+}
+
+/** 清除所有缓存文件 */
+export function clearTtsCache(dir: string): number {
+  if (!dir || !fs.existsSync(dir)) return 0;
+  let count = 0;
+  try {
+    const files = fs.readdirSync(dir);
+    for (const f of files) {
+      if (f.endsWith(".mp3")) {
+        fs.unlinkSync(path.join(dir, f));
+        count++;
+      }
+    }
+  } catch {}
+  return count;
 }
 
 /** 调用火山 TTS 合成一段文本，返回音频 blob */
@@ -194,22 +208,22 @@ async function volcanoSpeak(text: string, settings: KuaifanyiSettings): Promise<
   if (!chunks.length) return;
 
   speaking = true;
+  const cacheDir = settings.ttsCacheEnabled ? ensureCacheDir(resolveCacheDir(settings)) : "";
   try {
     for (const chunk of chunks) {
       if (!speaking) break;
       let blob: Blob | null = null;
 
       // 缓存命中：直接用，不调 API
-      if (settings.ttsCacheEnabled) {
-        blob = loadFromCache(chunk, settings.volcanoVoice);
+      if (cacheDir) {
+        blob = loadFromCache(chunk, settings.volcanoVoice, cacheDir);
       }
 
       if (!blob) {
         emitState("uploading");
         blob = await volcanoSynth(chunk, settings);
         emitState("synthesizing");
-        // 写入缓存
-        if (settings.ttsCacheEnabled) saveToCache(chunk, settings.volcanoVoice, blob);
+        if (cacheDir) saveToCache(chunk, settings.volcanoVoice, blob, cacheDir);
       }
       volcanoUsage.chars += chunk.length;
       volcanoUsage.calls += 1;

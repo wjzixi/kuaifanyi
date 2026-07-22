@@ -1,10 +1,14 @@
 // ============ API 提供商标识 ============
-export type ApiProvider = "deepseek" | "custom";
+export type ApiProvider = "deepseek" | "qwen" | "doubao" | "kimi" | "zhipu" | "custom";
 
 export interface ProviderConfig { name: string; apiUrl: string; model: string; }
 
 export const API_PRESETS: Record<ApiProvider, ProviderConfig> = {
   deepseek: { name: "DeepSeek", apiUrl: "https://api.deepseek.com/chat/completions", model: "deepseek-chat" },
+  qwen:     { name: "千问 (阿里云)", apiUrl: "https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions", model: "qwen-plus" },
+  doubao:   { name: "豆包 (火山方舟)", apiUrl: "https://ark.cn-beijing.volces.com/api/v3/chat/completions", model: "doubao-pro-256k" },
+  kimi:     { name: "Kimi (月之暗面)", apiUrl: "https://api.moonshot.cn/v1/chat/completions", model: "moonshot-v1-8k" },
+  zhipu:    { name: "智谱 GLM", apiUrl: "https://open.bigmodel.cn/api/paas/v4/chat/completions", model: "glm-4" },
   custom:   { name: "自定义（OpenAI 兼容）", apiUrl: "https://api.deepseek.com/chat/completions", model: "deepseek-chat" },
 };
 
@@ -39,6 +43,7 @@ export interface KuaifanyiSettings {
   volcanoSecretAccessKey: string;
   // 语音缓存
   ttsCacheEnabled: boolean;
+  ttsCacheDir: string;
   // 本月用量（自动维护，无需手填）
   volcanoMonth: string;
   volcanoMonthChars: number;
@@ -68,6 +73,7 @@ export const DEFAULT_SETTINGS: KuaifanyiSettings = {
   volcanoAccessKeyId: "",
   volcanoSecretAccessKey: "",
   ttsCacheEnabled: true,
+  ttsCacheDir: "",
   volcanoMonth: "",
   volcanoMonthChars: 0,
   volcanoMonthCalls: 0,

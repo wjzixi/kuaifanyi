@@ -6,7 +6,7 @@ const prod = process.argv.includes("production");
 const options = {
   entryPoints: ["main.ts"],
   bundle: true,
-  external: ["obsidian", "electron", "crypto", "fs", "path"],
+  external: ["obsidian", "electron", "crypto", "fs", "path", "process"],
   format: "cjs",
   target: "es2020",
   platform: "browser",
