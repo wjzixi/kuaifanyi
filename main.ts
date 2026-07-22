@@ -127,7 +127,8 @@ export default class KuaifanyiPlugin extends Plugin {
 
     await Promise.allSettled(promises);
     this.updateUsage();
-    this.refreshBalance();
+    await this.refreshBalance(); // 等余额返回后再更新一次
+    this.updateUsage();
     await this.saveSettings(); // 持久化本月语音用量
   }
   // ---- 弹窗 ----
@@ -205,24 +206,31 @@ export default class KuaifanyiPlugin extends Plugin {
     }
   }
 
-  private refreshBalance(): void {
+  private async refreshBalance(): Promise<void> {
     if (this.settings.apiKey) {
-      void fetchBalance(this.settings).then((b) => {
-        if (b) { this.balanceText = b; this.updateUsage(); }
-      });
+      const b = await fetchBalance(this.settings);
+      if (b) { this.balanceText = b; }
     }
     const { volcanoAccessKeyId, volcanoSecretAccessKey, volcanoAppId } = this.settings;
     if (volcanoAccessKeyId && volcanoSecretAccessKey) {
-      void fetchVolcanoBalance(volcanoAccessKeyId, volcanoSecretAccessKey).then((b) => {
-        if (b !== null) { this.volcanoBalanceText = `¥${b.toFixed(2)}`; this.updateUsage(); }
-      });
+      try {
+        const b = await fetchVolcanoBalance(volcanoAccessKeyId, volcanoSecretAccessKey);
+        if (b !== null) {
+          this.volcanoBalanceText = `¥${b.toFixed(2)}`;
+        } else {
+          this.volcanoBalanceText = "¥—"; // 查询失败兜底
+        }
+      } catch {
+        this.volcanoBalanceText = "¥—";
+      }
       // 官方用量（免费额度内可能为0，回退本地统计）
       const now = new Date();
       const start = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-01`;
       const end = now.toISOString().slice(0, 10);
-      void fetchVolcanoUsage(volcanoAccessKeyId, volcanoSecretAccessKey, volcanoAppId, start, end).then((chars) => {
-        if (chars !== null && chars > 0) { this.volcanoOfficialChars = chars; this.updateUsage(); }
-      });
+      try {
+        const chars = await fetchVolcanoUsage(volcanoAccessKeyId, volcanoSecretAccessKey, volcanoAppId, start, end);
+        if (chars !== null && chars > 0) { this.volcanoOfficialChars = chars; }
+      } catch {}
     }
   }
 
