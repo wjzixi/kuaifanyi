@@ -25,11 +25,16 @@ let currentAudio: HTMLAudioElement | null = null;
 let queue: SpeechSynthesisUtterance[] = [];
 let speaking = false;
 
-/** 清洗文本：标点转停顿 */
+/**
+ * 清洗文本供朗读：
+ * - 剔除装饰性符号（括号、Markdown 标记等），不念出声
+ * - 保留句读标点（。？！，、；：…）→ TTS 据此生成语气语调（升调/强调/停顿）
+ */
 export function cleanForSpeech(text: string): string {
   return text
-    .replace(/[【】《》（）「」『』""''*#`]/g, " ")
-    .replace(/[—…]/g, "，")
+    .replace(/https?:\/\/\S+/g, " ")          // URL 不念
+    .replace(/[【】《》「」『』""''*`#<>\[\]{}()（）~^|\\_]/g, " ") // 装饰符号
+    .replace(/[—–-]{2,}/g, "，")               // 长破折号→逗号停顿
     .replace(/\s{2,}/g, " ")
     .trim();
 }
@@ -107,7 +112,8 @@ async function volcanoSpeak(text: string, settings: KuaifanyiSettings): Promise<
     return;
   }
   stopSpeaking();
-  const chunks = splitForVolcano(text);
+  const cleaned = cleanForSpeech(text);
+  const chunks = splitForVolcano(cleaned);
   if (!chunks.length) return;
 
   speaking = true;

@@ -8,17 +8,21 @@
   border-radius: var(--radius-m);
   box-shadow: 0 2px 8px var(--background-modifier-box-shadow);
   padding: var(--size-4-3) var(--size-4-4);
-  width: fit-content;
-  max-width: 460px;
-  min-width: 260px;
-  /* 高度随内容自适应，上限 480px（原 400 +20%），用户可拖拽调整 */
+  /* 黄金比例：宽 460，高上限 = 宽 × 0.618；内容不足时高度动态收缩 */
+  width: min(460px, 90vw);
   height: auto;
-  max-height: 480px;
+  max-height: calc(min(460px, 90vw) * 0.618);
   overflow: auto;
   resize: both;
   font-size: var(--font-ui-small);
   font-family: var(--font-interface);
   color: var(--text-normal);
+}
+
+/* 用户手动调整后：解除最大宽高限制 */
+.kfy-popup.kfy-free-size {
+  max-width: none;
+  max-height: none;
 }
 
 .kfy-section {
