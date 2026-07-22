@@ -28,9 +28,9 @@ async function signedGet(
 ): Promise<any | null> {
   const { short, full } = amzDates();
   const payloadHash = await sha256Hex("");
-  const signedHeaders = "content-type;host;x-content-sha256;x-date";
+  // GET 请求不签 Content-Type（Electron 网络栈会自动处理，签了反而可能被剥离导致不匹配）
+  const signedHeaders = "host;x-content-sha256;x-date";
   const canonicalHeaders =
-    `content-type:application/x-www-form-urlencoded\n` +
     `host:${host}\n` +
     `x-content-sha256:${payloadHash}\n` +
     `x-date:${full}\n`;
@@ -48,7 +48,6 @@ async function signedGet(
     url: `https://${host}/?${query}`,
     method: "GET",
     headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
       "X-Date": full,
       "X-Content-Sha256": payloadHash,
       Authorization: `${ALGORITHM} Credential=${ak}/${credScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`,
