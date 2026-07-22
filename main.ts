@@ -452,8 +452,10 @@ class KuaifanyiSettingTab extends PluginSettingTab {
           const cached = this.plugin.settings.providerKeys[v];
           this.plugin.settings.apiKey = cached || "";
           await this.plugin.saveSettings();
-          // 刷新模型列表（新提供商）
-          void this.plugin.tryFetchModels();
+          // 刷新模型列表（等 API 返回再刷新面板）
+          if (this.plugin.settings.apiKey) {
+            await this.plugin.tryFetchModels();
+          }
           this.display();
         });
       });
@@ -613,8 +615,10 @@ class KuaifanyiSettingTab extends PluginSettingTab {
           .onChange(async (v) => { this.plugin.settings.ttsCacheDir = v; await this.plugin.saveSettings(); }))
         .addButton((btn) => btn.setButtonText("浏览").onClick(async () => {
           try {
-            const { dialog } = (require("electron") as any).remote || require("electron");
-            const result = await dialog.showOpenDialog({ properties: ["openDirectory"] });
+            const electron = require("electron") as any;
+            const dialog = electron.remote?.dialog || electron.dialog;
+            const win = electron.remote?.getCurrentWindow();
+            const result = await dialog.showOpenDialog(win, { properties: ["openDirectory"] });
             if (!result.canceled && result.filePaths?.length > 0) {
               const path = result.filePaths[0];
               this.plugin.settings.ttsCacheDir = path;

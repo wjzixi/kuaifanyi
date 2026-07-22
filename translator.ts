@@ -108,6 +108,14 @@ export function isWord(text: string): boolean {
 }
 
 // ---- 模型列表 ----
+const PROVIDER_MODEL_FILTERS: Record<string, RegExp> = {
+  deepseek: /deepseek/i,
+  qwen: /qwen/i,
+  doubao: /doubao|ark/i,
+  kimi: /moonshot/i,
+  zhipu: /glm|zhipu|cogview|charglm/i,
+};
+
 export async function fetchModels(settings: KuaifanyiSettings): Promise<string[]> {
   const apiUrl = getApiUrl(settings);
   const baseUrl = apiUrl.replace(/\/chat\/completions\/?$/, "");
@@ -116,7 +124,10 @@ export async function fetchModels(settings: KuaifanyiSettings): Promise<string[]
     headers: { Authorization: `Bearer ${settings.apiKey}` },
   });
   if (resp.status !== 200) throw new Error(`获取模型列表失败 (${resp.status})`);
-  return (resp.json.data || []).map((m: any) => m.id || m.model || m.name).filter(Boolean).sort();
+  let models = (resp.json.data || []).map((m: any) => m.id || m.model || m.name).filter(Boolean).sort();
+  const filter = PROVIDER_MODEL_FILTERS[settings.apiProvider];
+  if (filter) models = models.filter((m: string) => filter.test(m));
+  return models;
 }
 
 // ---- 词典式查词（模仿有道） ----
