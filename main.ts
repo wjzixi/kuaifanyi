@@ -361,8 +361,12 @@ export default class KuaifanyiPlugin extends Plugin {
 
   async loadSettings(): Promise<void> {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-    // 清理历史残留字段（已从接口中移除的旧配置项）
-    let dirty = !!(this.settings as any).volcanoCluster || !!(this.settings as any).ttsBackend;
+    let dirty = false;
+    // 迁移：旧版 API Key 未缓存 → 写入当前提供商的槽位
+    if (this.settings.apiKey && !this.settings.providerKeys[this.settings.apiProvider]) {
+      this.settings.providerKeys[this.settings.apiProvider] = this.settings.apiKey;
+      dirty = true;
+    }
     delete (this.settings as any).volcanoCluster;
     delete (this.settings as any).ttsBackend;
     delete (this.settings as any).targetLang;
@@ -435,8 +439,17 @@ class KuaifanyiSettingTab extends PluginSettingTab {
       .addDropdown((dd) => {
         for (const p of PROVIDERS) dd.addOption(p, API_PRESETS[p].name);
         dd.setValue(this.plugin.settings.apiProvider).onChange(async (v) => {
+          const prev = this.plugin.settings.apiProvider;
+          // 保存当前 Key 到缓存
+          if (this.plugin.settings.apiKey) {
+            this.plugin.settings.providerKeys[prev] = this.plugin.settings.apiKey;
+          }
           this.plugin.settings.apiProvider = v as ApiProvider;
-          await this.plugin.saveSettings(); this.display();
+          // 自动填充新提供商的已缓存 Key
+          const cached = this.plugin.settings.providerKeys[v];
+          this.plugin.settings.apiKey = cached || "";
+          await this.plugin.saveSettings();
+          this.display();
         });
       });
     new Setting(containerEl).setName("API Key").setDesc("对应服务商的 API 密钥")
@@ -445,6 +458,8 @@ class KuaifanyiSettingTab extends PluginSettingTab {
         t.setPlaceholder("sk-...").setValue(this.plugin.settings.apiKey)
           .onChange(async (v) => {
             this.plugin.settings.apiKey = v;
+            // 同步写入 providerKeys
+            if (v) this.plugin.settings.providerKeys[this.plugin.settings.apiProvider] = v;
             await this.plugin.saveSettings();
             void this.refreshModels();
           });

@@ -19,6 +19,7 @@ export type TtsEngine = "volcano" | "system";
 export interface KuaifanyiSettings {
   apiProvider: ApiProvider;
   apiKey: string;
+  providerKeys: Record<string, string>; // 各提供商的 API Key 缓存
   customApiUrl: string;
   customModel: string;
   translateModel: string;
@@ -53,6 +54,7 @@ export interface KuaifanyiSettings {
 export const DEFAULT_SETTINGS: KuaifanyiSettings = {
   apiProvider: "deepseek",
   apiKey: "",
+  providerKeys: {},
   customApiUrl: "https://api.deepseek.com/chat/completions",
   customModel: "deepseek-chat",
   translateModel: "deepseek-chat",
