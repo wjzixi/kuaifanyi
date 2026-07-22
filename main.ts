@@ -4,7 +4,8 @@ import {
 import type { KuaifanyiSettings } from "./settings";
 import { DEFAULT_SETTINGS, API_PRESETS, ApiProvider } from "./settings";
 import { streamTranslate, streamExplain, streamDictLookup, fetchModels, fetchBalance, usageStats, isChinese, isWord } from "./translator";
-import { speak, stopSpeaking, getChineseVoices, VOLCANO_VOICES, volcanoUsage } from "./tts";
+import { speak, stopSpeaking, getChineseVoices, VOLCANO_VOICES, volcanoUsage, VOLCANO_MONTHLY_QUOTA } from "./tts";
+import { fetchVolcanoBalance } from "./volc-billing";
 
 const PROVIDERS: ApiProvider[] = ["deepseek", "custom"];
 
@@ -23,6 +24,7 @@ export default class KuaifanyiPlugin extends Plugin {
   private streamSeq = 0; // 流式请求序号，用于竞态中止
   private usageEl: HTMLElement | null = null;
   private balanceText = "";
+  private volcanoBalanceText = "";
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -125,6 +127,7 @@ export default class KuaifanyiPlugin extends Plugin {
     await Promise.allSettled(promises);
     this.updateUsage();
     this.refreshBalance();
+    await this.saveSettings(); // 持久化本月语音用量
   }
   // ---- 弹窗 ----
   private showPopup(range: Range, isDict: boolean): void {
@@ -187,18 +190,28 @@ export default class KuaifanyiPlugin extends Plugin {
       line1.textContent = `DeepSeek  ${dsParts.join("  ·  ")}`;
     }
 
-    // 第二行：语音合成（字符消耗）
-    if (volcanoUsage.chars > 0) {
+    // 第二行：语音合成（本月用量 / 免费额度 · 余额）
+    if (this.settings.ttsEngine === "volcano") {
+      const vParts: string[] = [];
+      vParts.push(`${this.settings.volcanoMonthChars.toLocaleString()} / ${VOLCANO_MONTHLY_QUOTA.toLocaleString()} 字（本月免费额度）`);
+      if (this.volcanoBalanceText) vParts.push(`余额 ${this.volcanoBalanceText}`);
       const line2 = this.usageEl.createDiv("kfy-usage-line");
-      line2.textContent = `语音合成  ${volcanoUsage.chars} 字 / ${volcanoUsage.calls} 次`;
+      line2.textContent = `语音合成  ${vParts.join("  ·  ")}`;
     }
   }
 
   private refreshBalance(): void {
-    if (!this.settings.apiKey) return;
-    void fetchBalance(this.settings).then((b) => {
-      if (b) { this.balanceText = b; this.updateUsage(); }
-    });
+    if (this.settings.apiKey) {
+      void fetchBalance(this.settings).then((b) => {
+        if (b) { this.balanceText = b; this.updateUsage(); }
+      });
+    }
+    const { volcanoAccessKeyId, volcanoSecretAccessKey } = this.settings;
+    if (volcanoAccessKeyId && volcanoSecretAccessKey) {
+      void fetchVolcanoBalance(volcanoAccessKeyId, volcanoSecretAccessKey).then((b) => {
+        if (b !== null) { this.volcanoBalanceText = `¥${b.toFixed(2)}`; this.updateUsage(); }
+      });
+    }
   }
 
   private hidePopup(): void {
@@ -484,6 +497,19 @@ class KuaifanyiSettingTab extends PluginSettingTab {
             .setValue(curVoice)
             .onChange(async (v) => { this.plugin.settings.volcanoVoice = v; await this.plugin.saveSettings(); }));
       }
+
+      // 余额查询（可选）：火山 AccessKey
+      new Setting(containerEl).setName("AccessKey ID（可选）").setDesc("用于查询账户余额，火山控制台「密钥管理」获取")
+        .addText((t) => t.setPlaceholder("AKxxxx")
+          .setValue(this.plugin.settings.volcanoAccessKeyId)
+          .onChange(async (v) => { this.plugin.settings.volcanoAccessKeyId = v; await this.plugin.saveSettings(); }));
+      new Setting(containerEl).setName("Secret AccessKey（可选）").setDesc("同上，仅本地存储")
+        .addText((t) => {
+          t.inputEl.type = "password";
+          t.setPlaceholder("SKxxxx")
+            .setValue(this.plugin.settings.volcanoSecretAccessKey)
+            .onChange(async (v) => { this.plugin.settings.volcanoSecretAccessKey = v; await this.plugin.saveSettings(); });
+        });
     } else {
       const voices = getChineseVoices();
       if (voices.length > 0) {

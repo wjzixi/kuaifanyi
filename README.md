@@ -1,44 +1,43 @@
-# Kuaifanyi 快翻译
+# 快翻译 Kuaifanyi
 
-**Select text → instant dictionary / streaming translation + AI explanation + natural TTS reading. An Obsidian plugin.**
+An Obsidian plugin that translates and reads aloud instantly. Short words get a dictionary lookup (Youdao-style), long text gets streaming translation, with AI explanation and neural TTS.
 
-选中文本 → 词典/流式翻译 + AI 解释 + 真人感语音朗读，一站式 Obsidian 阅读助手。
-
----
+<p align="center">
+  <img src="assets/demo.gif" alt="Demo" width="700">
+</p>
 
 ## ✨ Features
 
 | Feature | Description |
 |---------|-------------|
-| 🎯 **Smart dual mode** | Words/abbreviations → **dictionary card** (IPA, multi-domain definitions, examples, Youdao-style); sentences → **streaming translation** with typewriter rendering |
-| 🌐 **Auto direction** | Chinese→English, others→Chinese. Zero config |
-| 💡 **Parallel AI explanation** | Translation & explanation stream in parallel, rendered independently |
-| 🔊 **Natural Chinese TTS** | Doubao (Volcano Engine) neural voices — 13 verified voices (Vivi 2.0, Cancan, Yunzhou...), **voice cloning supported** (record 10s, paste your `S_xxx` voice ID) |
-| 🪟 **Smart popup** | Follows selection, tracks scrolling, draggable, resizable, golden-ratio default, never leaves the window |
-| 🤖 **Model auto-discovery** | Paste API key → available models fetched into dropdowns |
-| ⚡ **Flexible trigger** | Direct select or Ctrl+select, adjustable debounce |
-| 🔌 **OpenAI-compatible** | DeepSeek by default; any OpenAI-format endpoint (Kimi, Zhipu, Ollama...) |
-| 📊 **Usage meter** | Token cost (in/out split), TTS characters, and account balance in popup footer |
+| 🎯 **Dual Mode** | Short words → dictionary (phonetics, multi-domain definitions, examples) · Long text → streaming translation, typewriter rendering |
+| 🌐 **Auto Direction** | Chinese → English, others → Chinese. No manual setting. |
+| 💡 **AI Explanation** | Parallel streaming explanation alongside translation |
+| 🔊 **Neural TTS** | Volcano Engine (ByteDance) large model voices — 13 verified voice styles, **supports voice cloning** (paste a `S_xxx` ID from the Volcano console) |
+| 🪟 **Smart Popup** | Follows selection, tracks scrolling, draggable, resizable, golden ratio by default |
+| 🤖 **Auto Model Discovery** | Fetches available models from your API endpoint into a dropdown |
+| ⚡ **Configurable Trigger** | Direct select / Ctrl+Select, adjustable debounce |
+| 🔌 **OpenAI Compatible** | Default DeepSeek; switch to any OpenAI-format endpoint (Kimi, GLM, Ollama…). Long text auto-chunked. |
 
-## 📦 Installation
+## 📦 Install
 
 1. Download `main.js`, `manifest.json`, `styles.css` from [Releases](../../releases)
-2. Copy to `<vault>/.obsidian/plugins/kuaifanyi/`
-3. Restart Obsidian → Settings → Community plugins → Enable **快翻译**
+2. Copy into `<vault>/.obsidian/plugins/kuaifanyi/`
+3. Restart Obsidian → Settings → Community Plugins → enable **快翻译 (Kuaifanyi)**
 
-## ⚙️ Configuration
+## ⚙️ Setup
 
 ### Translation API (required)
-- Default: DeepSeek — paste your [DeepSeek API key](https://platform.deepseek.com/api_keys)
-- Or choose "Custom" for any OpenAI-compatible endpoint
+- **DeepSeek** (default): get a key at [platform.deepseek.com](https://platform.deepseek.com/api_keys)
+- **Custom**: any OpenAI-compatible endpoint (Kimi, Zhipu, Ollama, local LLM…)
 
-### Doubao TTS (optional, recommended for Chinese)
-1. Open [Volcano Engine Console](https://console.volcengine.com/speech), enable "语音合成大模型" (TTS)
-2. Create an app → get **AppID** + **Access Token**
-3. Plugin settings → TTS → paste them, pick a voice
-4. **Voice cloning**: console "声音复刻" → record 10s → get `S_xxx` ID → select "自定义克隆音色" and paste
+### Volcano TTS (optional, recommended)
+1. [Volcano Engine Console](https://console.volcengine.com/speech) → activate **Speech Synthesis Large Model**
+2. Create an app → grab **AppID** + **Access Token**
+3. Plugin settings → TTS → paste them
+4. **Voice cloning**: Console → Sound Replication → record 10s → get a `S_xxx` voice ID → select "Custom Clone" in the voice dropdown and paste it
 
-## 🛠 Development
+## 🛠 Dev
 
 ```bash
 npm install
@@ -46,32 +45,49 @@ npm run dev    # watch mode
 npm run build  # production
 ```
 
-Stack: TypeScript + esbuild + Obsidian API (`requestUrl`, SSE streaming, Web Speech, Volcano TTS HTTP API)
+Tech: TypeScript + esbuild + Obsidian API (`requestUrl` / SSE streaming / Web Speech / Volcano TTS HTTP API)
 
----
+## ☕ Sponsor
 
-## 中文说明
-
-选中即翻译插件：
-
-- **短词**（单词/缩写/词组）自动切换词典模式：音标、多领域释义、专业释义、双语例句
-- **长句**流式翻译：SSE 逐字渲染，中英方向自动识别
-- **AI 解释**与翻译并行生成，同屏独立渲染
-- **豆包神经语音朗读**：火山引擎 2.0 音色（Vivi/灿灿/云舟等 13 款实测），支持录音克隆自己的声音
-- 弹窗跟随选区、滚动追踪、可拖拽、黄金比例、高度自适应
-- 模型列表自动拉取，DeepSeek 余额与 token 用量实时显示
-
-## ☕ Sponsorship 赞助
-
-If this plugin helps you, buy me a coffee (min ¥5) / 如果对你有帮助，欢迎自由赞助（最低 ¥5）：
+If this plugin helps you, feel free to support (min **¥5** ~ $0.70):
 
 <table>
   <tr>
-    <td align="center"><img src="assets/sponsor-wechat.png" width="220" alt="WeChat Pay"><br><b>微信支付 WeChat</b></td>
-    <td align="center"><img src="assets/sponsor-alipay.jpg" width="220" alt="Alipay"><br><b>支付宝 Alipay</b></td>
+    <td align="center"><img src="assets/sponsor-wechat.png" width="220" alt="WeChat Pay"><br><b>WeChat Pay</b></td>
+    <td align="center"><img src="assets/sponsor-alipay.jpg" width="220" alt="Alipay"><br><b>Alipay</b></td>
   </tr>
 </table>
 
 ## License
 
 MIT
+
+---
+
+# 中文文档
+
+## ✨ 特点
+
+| 特性 | 说明 |
+|------|------|
+| 🎯 **双模式智能切换** | 短词/缩写自动走**词典模式**（音标、多领域释义、例句，模仿有道）；长句走**流式翻译**，逐字渲染 |
+| 🌐 **方向自动识别** | 中文→英文，其它语言→中文，无需设置 |
+| 💡 **AI 解释并行生成** | 翻译与解释并行请求、同屏逐字渲染，互不阻塞 |
+| 🔊 **豆包神经语音** | 火山引擎大模型语音，13 个实测音色（Vivi 2.0 / 灿灿 / 云舟等），**支持声音克隆**（粘贴 S_xxx ID 即用自己的声音） |
+| 🪟 **智能弹窗** | 跟随选区、滚动实时追踪、可拖拽固定、宽高可调、黄金比例默认 |
+| 🤖 **模型自动发现** | 填入 API Key 自动拉取可用模型，下拉选择翻译/解释模型 |
+| ⚡ **触发可配** | 直接选中 / Ctrl+选中，延迟可调 |
+| 🔌 **OpenAI 兼容** | 默认 DeepSeek，可换任意 OpenAI 格式端点；长文本自动分段 |
+
+（安装和配置说明见上方英文文档。）
+
+## ☕ 赞助
+
+如果这个项目对你有帮助，欢迎自由赞助（**最低 ¥5**，心意不分多少）：
+
+<table>
+  <tr>
+    <td align="center"><img src="assets/sponsor-wechat.png" width="220" alt="微信收款码"><br><b>微信支付</b></td>
+    <td align="center"><img src="assets/sponsor-alipay.jpg" width="220" alt="支付宝收款码"><br><b>支付宝</b></td>
+  </tr>
+</table>

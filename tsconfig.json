@@ -11,6 +11,6 @@
     "outDir": "./",
     "rootDir": "."
   },
-  "include": ["main.ts", "settings.ts", "translator.ts", "tts.ts"],
+  "include": ["main.ts", "settings.ts", "translator.ts", "tts.ts", "volc-billing.ts"],
   "exclude": ["node_modules"]
 }

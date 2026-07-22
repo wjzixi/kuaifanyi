@@ -28,6 +28,20 @@ let speaking = false;
 /** 火山合成字符统计（本次会话） */
 export const volcanoUsage = { chars: 0, calls: 0 };
 
+/** 本月免费额度（大模型语音合成：2万字符/月） */
+export const VOLCANO_MONTHLY_QUOTA = 20000;
+
+/** 记录用量到设置（跨月自动清零），返回当月累计 */
+export function trackMonthly(s: KuaifanyiSettings, chars: number): number {
+  const nowMonth = new Date().toISOString().slice(0, 7); // "2026-07"
+  if (s.volcanoMonth !== nowMonth) {
+    s.volcanoMonth = nowMonth;
+    s.volcanoMonthChars = 0;
+  }
+  s.volcanoMonthChars += chars;
+  return s.volcanoMonthChars;
+}
+
 /**
  * 清洗文本供朗读：
  * - 剔除装饰性符号（括号、Markdown 标记等），不念出声
@@ -126,6 +140,7 @@ async function volcanoSpeak(text: string, settings: KuaifanyiSettings): Promise<
       const blob = await volcanoSynth(chunk, settings);
       volcanoUsage.chars += chunk.length;
       volcanoUsage.calls += 1;
+      trackMonthly(settings, chunk.length);
       if (!speaking) break;
       await playBlob(blob);
     }
