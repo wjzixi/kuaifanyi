@@ -36,10 +36,11 @@ export default class KuaifanyiPlugin extends Plugin {
     // TTS 状态回调
     setTtsStateCallback((s) => this.setTtsState(s));
 
-    // 缓存基础路径（限在库内：.obsidian/plugins/kuaifanyi/tts-cache）
-    setCacheBase((this.app.vault.adapter as any).basePath + "/" + (this.app.vault.configDir || ".obsidian") + "/plugins/kuaifanyi/tts-cache");
+    // 缓存基础路径（限在库内）
+    const configDir = (this.app.vault as any).configDir || ".obsidian";
+    setCacheBase((this.app.vault.adapter as any).basePath + "/" + configDir + "/plugins/kuaifanyi/tts-cache");
 
-    if (this.settings.apiKey) this.tryFetchModels();
+    if (this.settings.apiKey) void this.tryFetchModels();
     // 启动时拉一次官方数据，避免显示落盘残留
     void this.refreshBalance();
 
@@ -457,6 +458,11 @@ class KuaifanyiSettingTab extends PluginSettingTab {
 
   constructor(app: any, plugin: KuaifanyiPlugin) { super(app, plugin); this.plugin = plugin; }
 
+  getSettingDefinitions(): ReturnType<PluginSettingTab["getSettingDefinitions"]> {
+    // Declarative API not adopted yet — display() handles dynamic UI
+    return [];
+  }
+
   private async refreshModels(): Promise<void> {
     if (!this.plugin.settings.apiKey) return;
     await this.plugin.tryFetchModels();
@@ -660,7 +666,8 @@ class KuaifanyiSettingTab extends PluginSettingTab {
           .onChange(async (v) => { this.plugin.settings.ttsCacheEnabled = v; await this.plugin.saveSettings(); }));
 
       const vaultPath = (this.plugin.app.vault.adapter as any).basePath || ".";
-      const defaultCacheDir = vaultPath + "/" + (this.app.vault.configDir || ".obsidian") + "/plugins/kuaifanyi/tts-cache";
+      const configDir = (this.plugin.app.vault as any).configDir || ".obsidian";
+      const defaultCacheDir = vaultPath + "/" + configDir + "/plugins/kuaifanyi/tts-cache";
       new Setting(containerEl).setName("缓存目录").setDesc(`存放音频文件，默认 ${defaultCacheDir}`)
         .addText((t) => t.setPlaceholder(defaultCacheDir)
           .setValue(this.plugin.settings.ttsCacheDir)
