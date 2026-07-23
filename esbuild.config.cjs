@@ -12,6 +12,7 @@ const options = {
   platform: "browser",
   outfile: "main.js",
   minify: prod,
+  keepNames: true,
   sourcemap: prod ? false : "inline",
   treeShaking: true,
   logLevel: "info",
