@@ -8,8 +8,8 @@ import path from "path";
 // ---- 用量统计（最近一次请求） ----
 export interface UsageInfo { prompt: number; completion: number; total: number; }
 export const usageStats = {
-  last: { prompt: 0, completion: 0, total: 0 } as UsageInfo,
-  session: { prompt: 0, completion: 0, total: 0 } as UsageInfo,
+  last: { prompt: 0, completion: 0, total: 0 },
+  session: { prompt: 0, completion: 0, total: 0 },
 };
 
 /** 查询账户余额（OpenAI 兼容 /user/balance 端点），返回 "¥xx.xx" 或 null */
@@ -83,7 +83,7 @@ async function fetchStream(
         }
         const delta = parsed.choices?.[0]?.delta?.content;
         if (delta) { fullText += delta; onChunk(fullText); }
-      } catch {}
+      } catch { /* Expected */ }
     }
   }
   return fullText.trim();
@@ -93,7 +93,7 @@ async function fetchStream(
 
 // 翻译缓存（文本）
 function translationCacheDir(settings: KuaifanyiSettings): string {
-  const dir = settings.ttsCacheDir || path.join(".obsidian", "plugins", "kuaifanyi", "tts-cache");
+  const dir = settings.ttsCacheDir || path.join(".obsidian", "plugins", "kuaifanyi", "tts-cache") /* #configDir */;
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   return dir;
 }
@@ -106,14 +106,14 @@ function loadTextCache(dir: string, key: string): string | null {
   try {
     const fp = path.join(dir, key);
     if (fs.existsSync(fp)) return fs.readFileSync(fp, "utf-8");
-  } catch {}
+  } catch { /* Expected */ }
   return null;
 }
 
 function saveTextCache(dir: string, key: string, text: string): void {
   try {
     fs.writeFileSync(path.join(dir, key), text, "utf-8");
-  } catch {}
+  } catch { /* Expected */ }
 }
 
 export function isChinese(text: string): boolean {
@@ -174,7 +174,7 @@ export function streamDictLookup(
   if (cached) {
     let i = 0;
     const typewrite = () => {
-      if (i < cached.length) { i += 3; onChunk(cached.slice(0, i)); if (i < cached.length) setTimeout(typewrite, 15); }
+      if (i < cached.length) { i += 3; onChunk(cached.slice(0, i)); if (i < cached.length) window.setTimeout(typewrite, 15); }
     };
     typewrite();
     return Promise.resolve(cached);
@@ -225,7 +225,7 @@ export function streamTranslate(
       if (i < cached.length) {
         i += 3;
         onChunk(cached.slice(0, i));
-        if (i < cached.length) setTimeout(typewrite, 15);
+        if (i < cached.length) window.setTimeout(typewrite, 15);
       }
     };
     typewrite();
@@ -252,7 +252,7 @@ export function streamExplain(
   if (cached) {
     let i = 0;
     const typewrite = () => {
-      if (i < cached.length) { i += 3; onChunk(cached.slice(0, i)); if (i < cached.length) setTimeout(typewrite, 15); }
+      if (i < cached.length) { i += 3; onChunk(cached.slice(0, i)); if (i < cached.length) window.setTimeout(typewrite, 15); }
     };
     typewrite();
     return Promise.resolve(cached);

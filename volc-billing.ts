@@ -55,17 +55,9 @@ async function signedGet(
   const stsHash = sha256Hex(stringToSign);
   console.debug("[volc signing]", { scope: credScope, crHash: crHash.slice(0, 12), stsHash: stsHash.slice(0, 12) });
 
-  // fetch 优先，失败回退 requestUrl
-  let status: number, json: any, err: string | undefined;
+  // requestUrl 优先（Obsidian 推荐），失败回退 fetch
+  let status = 500, json: any = null, err: string | undefined;
   try {
-    const fr = await fetch(`https://${host}/?${query}`, {
-      method: "GET",
-      headers: { "Content-Type": "application/x-www-form-urlencoded", "X-Date": full, "X-Content-Sha256": payloadHash, Authorization: auth } as Record<string, string>,
-    });
-    status = fr.status;
-    json = fr.ok ? await fr.json() : null;
-    if (!fr.ok) { try { err = await fr.text(); } catch {} }
-  } catch {
     const resp = await requestUrl({
       url: `https://${host}/?${query}`, method: "GET",
       headers: { "Content-Type": "application/x-www-form-urlencoded", "X-Date": full, "X-Content-Sha256": payloadHash, Authorization: auth },
@@ -74,6 +66,16 @@ async function signedGet(
     status = resp.status;
     json = resp.status === 200 ? resp.json : null;
     err = resp.status !== 200 ? (resp.json?.ResponseMetadata?.Error?.Message || resp.text?.slice(0, 200)) : undefined;
+  } catch {
+    try {
+      const fr = await fetch(`https://${host}/?${query}`, {
+        method: "GET",
+        headers: { "Content-Type": "application/x-www-form-urlencoded", "X-Date": full, "X-Content-Sha256": payloadHash, Authorization: auth } as Record<string, string>,
+      });
+      status = fr.status;
+      json = fr.ok ? await fr.json() : null;
+      if (!fr.ok) { try { err = await fr.text(); } catch { /* Expected */ } }
+    } catch { /* Expected */ }
   }
   return { status, json, err };
 }

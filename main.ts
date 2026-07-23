@@ -37,7 +37,7 @@ export default class KuaifanyiPlugin extends Plugin {
     setTtsStateCallback((s) => this.setTtsState(s));
 
     // 缓存基础路径（限在库内：.obsidian/plugins/kuaifanyi/tts-cache）
-    setCacheBase((this.app.vault.adapter as any).basePath + "/.obsidian/plugins/kuaifanyi/tts-cache");
+    setCacheBase((this.app.vault.adapter as any).basePath + "/" + (this.app.vault.configDir || ".obsidian") + "/plugins/kuaifanyi/tts-cache");
 
     if (this.settings.apiKey) this.tryFetchModels();
     // 启动时拉一次官方数据，避免显示落盘残留
@@ -50,7 +50,7 @@ export default class KuaifanyiPlugin extends Plugin {
     this.registerDomEvent(document, "wheel", onScroll, { capture: true });
 
     this.registerDomEvent(document, "mouseup", (evt: MouseEvent) => {
-      if (this.timer) clearTimeout(this.timer);
+      if (this.timer) window.clearTimeout(this.timer);
       this.timer = window.setTimeout(() => this.onSelection(evt), this.settings.triggerDebounce);
     });
 
@@ -96,7 +96,7 @@ export default class KuaifanyiPlugin extends Plugin {
       void this.refreshBalance().then(() => this.updateUsage());
       void speak(text, this.settings).then(() => {
         this.updateUsage();
-        setTimeout(() => this.updateUsage(), 100);
+        window.setTimeout(() => this.updateUsage(), 100);
       });
     }
   }
@@ -255,7 +255,7 @@ export default class KuaifanyiPlugin extends Plugin {
             if (b !== null) this.balanceText = `¥${b.toFixed(2)}`;
           }
         }
-      } catch {}
+      } catch { /* Expected */ }
     }
     // 火山 TTS 余额 + 官方用量
     const { volcanoAccessKeyId, volcanoSecretAccessKey, volcanoAppId } = this.settings;
@@ -263,14 +263,14 @@ export default class KuaifanyiPlugin extends Plugin {
       try {
         const b = await fetchVolcanoBalance(volcanoAccessKeyId, volcanoSecretAccessKey);
         if (b !== null) this.volcanoBalanceText = `余额 ¥${b.toFixed(2)}`;
-      } catch {}
+      } catch { /* Expected */ }
       try {
         const d = new Date();
         const start = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-01`;
         const end = d.toISOString().slice(0, 10);
         const chars = await fetchVolcanoUsage(volcanoAccessKeyId, volcanoSecretAccessKey, volcanoAppId, start, end);
         if (chars !== null && chars > 0) this.volcanoOfficialChars = chars;
-      } catch {}
+      } catch { /* Expected */ }
     }
   }
 
@@ -295,7 +295,7 @@ export default class KuaifanyiPlugin extends Plugin {
     this.usageEl = null;
     this.ttsIndicator = null;
     this.ttsIndicatorText = null;
-    if (this.followFrame !== null) { cancelAnimationFrame(this.followFrame); this.followFrame = null; }
+    if (this.followFrame !== null) { window.cancelAnimationFrame(this.followFrame); this.followFrame = null; }
   }
 
   private computePosition(range: Range): { top: number; left: number } {
@@ -343,13 +343,13 @@ export default class KuaifanyiPlugin extends Plugin {
   }
 
   private startFollow(): void {
-    if (this.followFrame !== null) cancelAnimationFrame(this.followFrame);
+    if (this.followFrame !== null) window.cancelAnimationFrame(this.followFrame);
     const loop = () => {
       if (!this.popup) { this.followFrame = null; return; }
       if (!this.popupMoved) this.repositionPopup();
-      this.followFrame = requestAnimationFrame(loop);
+      this.followFrame = window.requestAnimationFrame(loop);
     };
-    this.followFrame = requestAnimationFrame(loop);
+    this.followFrame = window.requestAnimationFrame(loop);
   }
 
   private makeDraggable(handle: HTMLElement): void {
@@ -434,13 +434,13 @@ class TypeWriter {
   }
 
   finish(el: HTMLElement, fullText: string): void {
-    if (this.timer !== null) { clearTimeout(this.timer); this.timer = null; }
+    if (this.timer !== null) { window.clearTimeout(this.timer); this.timer = null; }
     this.displayed = fullText.length;
     el.textContent = fullText;
   }
 
   private renderNext(el: HTMLElement, fullText: string): void {
-    if (this.timer !== null) clearTimeout(this.timer);
+    if (this.timer !== null) window.clearTimeout(this.timer);
     if (this.displayed >= fullText.length) return;
     const chunk = Math.min(3, fullText.length - this.displayed);
     this.displayed += chunk;
@@ -551,7 +551,7 @@ class KuaifanyiSettingTab extends PluginSettingTab {
     new Setting(containerEl).setHeading().setName("🌐 翻译");
     new Setting(containerEl).setName("分段大小").setDesc("长文本每段最大字符数（短词自动走词典模式，方向中英自动）")
       .addSlider((s) => s.setLimits(500, 8000, 500).setValue(this.plugin.settings.chunkSize)
-        .setDynamicTooltip().onChange(async (v) => { this.plugin.settings.chunkSize = v; await this.plugin.saveSettings(); }));
+        .onChange(async (v) => { this.plugin.settings.chunkSize = v; await this.plugin.saveSettings(); }));
 
     // ---- 触发方式 ----
     new Setting(containerEl).setHeading().setName("⚡ 触发方式");
@@ -573,7 +573,7 @@ class KuaifanyiSettingTab extends PluginSettingTab {
         .onChange(async (v) => { this.plugin.settings.autoRead = v; await this.plugin.saveSettings(); }));
     new Setting(containerEl).setName("触发延迟(ms)").setDesc("选中后等待多久触发")
       .addSlider((s) => s.setLimits(100, 2000, 100).setValue(this.plugin.settings.triggerDebounce)
-        .setDynamicTooltip().onChange(async (v) => { this.plugin.settings.triggerDebounce = v; await this.plugin.saveSettings(); }));
+        .onChange(async (v) => { this.plugin.settings.triggerDebounce = v; await this.plugin.saveSettings(); }));
 
     // ---- 朗读 ----
     new Setting(containerEl).setHeading().setName("🔊 朗读");
@@ -660,27 +660,12 @@ class KuaifanyiSettingTab extends PluginSettingTab {
           .onChange(async (v) => { this.plugin.settings.ttsCacheEnabled = v; await this.plugin.saveSettings(); }));
 
       const vaultPath = (this.plugin.app.vault.adapter as any).basePath || ".";
-      const defaultCacheDir = vaultPath + "/.obsidian/plugins/kuaifanyi/tts-cache";
+      const defaultCacheDir = vaultPath + "/" + (this.app.vault.configDir || ".obsidian") + "/plugins/kuaifanyi/tts-cache";
       new Setting(containerEl).setName("缓存目录").setDesc(`存放音频文件，默认 ${defaultCacheDir}`)
         .addText((t) => t.setPlaceholder(defaultCacheDir)
           .setValue(this.plugin.settings.ttsCacheDir)
           .onChange(async (v) => { this.plugin.settings.ttsCacheDir = v; await this.plugin.saveSettings(); }))
-        .addButton((btn) => btn.setButtonText("浏览").onClick(async () => {
-          try {
-            const electron = require("electron") as any;
-            const dialog = electron.remote?.dialog || electron.dialog;
-            const win = electron.remote?.getCurrentWindow();
-            const result = await dialog.showOpenDialog(win, { properties: ["openDirectory"] });
-            if (!result.canceled && result.filePaths?.length > 0) {
-              const path = result.filePaths[0];
-              this.plugin.settings.ttsCacheDir = path;
-              await this.plugin.saveSettings();
-              this.display();
-            }
-          } catch (e: any) {
-            new Notice(`无法打开文件夹选择器: ${e.message}`);
-          }
-        }));
+;
 
       new Setting(containerEl).setName("清除语音缓存").setDesc("删除所有已缓存的语音文件")
         .addButton((btn) => btn.setButtonText("立即清除").onClick(() => {
@@ -703,9 +688,9 @@ class KuaifanyiSettingTab extends PluginSettingTab {
 
     new Setting(containerEl).setName("语速").setDesc("0.5 ~ 2.0（豆包映射 0.8~2.0）")
       .addSlider((s) => s.setLimits(0.5, 2.0, 0.1).setValue(this.plugin.settings.ttsRate)
-        .setDynamicTooltip().onChange(async (v) => { this.plugin.settings.ttsRate = v; await this.plugin.saveSettings(); }));
+        .onChange(async (v) => { this.plugin.settings.ttsRate = v; await this.plugin.saveSettings(); }));
     new Setting(containerEl).setName("音调").setDesc("0.5 ~ 2.0")
       .addSlider((s) => s.setLimits(0.5, 2.0, 0.1).setValue(this.plugin.settings.ttsPitch)
-        .setDynamicTooltip().onChange(async (v) => { this.plugin.settings.ttsPitch = v; await this.plugin.saveSettings(); }));
+        .onChange(async (v) => { this.plugin.settings.ttsPitch = v; await this.plugin.saveSettings(); }));
   }
 }

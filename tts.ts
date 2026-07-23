@@ -132,7 +132,7 @@ function loadFromCache(text: string, voice: string, dir: string): Blob | null {
       const buf = fs.readFileSync(fp);
       return new Blob([buf], { type: "audio/mp3" });
     }
-  } catch {}
+  } catch { /* Expected */ }
   return null;
 }
 
@@ -144,7 +144,7 @@ function saveToCache(text: string, voice: string, blob: Blob, dir: string): void
     blob.arrayBuffer().then((buf) => {
       fs.writeFileSync(fp, Buffer.from(buf));
     }).catch(() => {});
-  } catch {}
+  } catch { /* Expected */ }
 }
 
 /** 清除所有缓存文件 */
@@ -159,7 +159,7 @@ export function clearTtsCache(dir: string): number {
         count++;
       }
     }
-  } catch {}
+  } catch { /* Expected */ }
   return count;
 }
 
@@ -305,12 +305,12 @@ function webSpeak(text: string, settings: KuaifanyiSettings): Promise<void> {
       if (i === phrases.length - 1) {
         utt.onend = () => { resolve(); speaking = false; };
       } else {
-        utt.onend = () => setTimeout(() => playNext(synth), 120);
+        utt.onend = () => window.setTimeout(() => playNext(synth), 120);
       }
       queue.push(utt);
     }
     speaking = true;
-    setTimeout(() => playNext(synth), 80);
+    window.setTimeout(() => playNext(synth), 80);
   });
 }
 
