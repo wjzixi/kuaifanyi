@@ -130,20 +130,23 @@ function loadFromCache(text: string, voice: string, dir: string): Blob | null {
   try {
     if (fs.existsSync(fp)) {
       const buf = fs.readFileSync(fp);
-      return new Blob([buf], { type: "audio/mp3" });
+      // Node Buffer → 标准 ArrayBuffer，Electron 渲染进程才认
+      const ab = new ArrayBuffer(buf.length);
+      const view = new Uint8Array(ab);
+      view.set(buf);
+      return new Blob([ab], { type: "audio/mp3" });
     }
   } catch { /* Expected */ }
   return null;
 }
 
-/** 保存音频到缓存 */
-function saveToCache(text: string, voice: string, blob: Blob, dir: string): void {
+/** 保存音频到缓存（异步写入，返回 Promise 确保落盘） */
+async function saveToCache(text: string, voice: string, blob: Blob, dir: string): Promise<void> {
   if (!text || !voice || !blob) return;
   try {
     const fp = cacheName(text, voice, dir);
-    blob.arrayBuffer().then((buf) => {
-      fs.writeFileSync(fp, Buffer.from(buf));
-    }).catch(() => {});
+    const buf = await blob.arrayBuffer();
+    fs.writeFileSync(fp, Buffer.from(buf));
   } catch { /* Expected */ }
 }
 
@@ -236,7 +239,7 @@ async function volcanoSpeak(text: string, settings: KuaifanyiSettings): Promise<
         emitState("uploading");
         blob = await volcanoSynth(chunk, settings);
         emitState("synthesizing");
-        if (cacheDir) saveToCache(chunk, settings.volcanoVoice, blob, cacheDir);
+        if (cacheDir) await saveToCache(chunk, settings.volcanoVoice, blob, cacheDir);
       }
       volcanoUsage.chars += chunk.length;
       volcanoUsage.calls += 1;
