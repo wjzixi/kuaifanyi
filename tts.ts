@@ -65,7 +65,7 @@ export function trackMonthly(s: KuaifanyiSettings, chars: number): number {
 export function cleanForSpeech(text: string): string {
   return text
     .replace(/https?:\/\/\S+/g, " ")          // URL 不念
-    .replace(/[\]\[{}()【】《》「」『』""''*`#<>（）~^|\\_!=+\-]/g, " ") // 所有装饰符号
+    .replace(/[\]\[{}()【】《》「」『』""''*`#<>（）~^|\\_!=+-]/g, " ") // 所有装饰符号
     .replace(/[—–-]{2,}/g, "，")               // 长破折号→逗号停顿
     .replace(/\s{2,}/g, " ")
     .trim();
@@ -256,8 +256,8 @@ async function volcanoSpeak(text: string, settings: KuaifanyiSettings): Promise<
       emitState("reading");
       await playBlob(blob);
     }
-  } catch (e: any) {
-    new Notice(`豆包语音失败: ${e.message}`);
+  } catch (e: unknown) {
+    new Notice(`豆包语音失败: ${e instanceof Error ? e.message : String(e)}`);
   }
   emitState("idle");
   speaking = false;

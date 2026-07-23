@@ -38,8 +38,9 @@ export default class KuaifanyiPlugin extends Plugin {
     setTtsStateCallback((s) => this.setTtsState(s));
 
     // 缓存基础路径
-    const configDir = (this.app.vault as any).configDir || ".obsidian";
-    const cacheBase = (this.app.vault.adapter as any).basePath + "/" + configDir + "/plugins/kuaifanyi/tts-cache";
+    const configDir = this.app.vault.configDir || ".obsidian";
+    const basePath = (this.app.vault.adapter as unknown as { basePath: string }).basePath;
+    const cacheBase = basePath + "/" + configDir + "/plugins/kuaifanyi/tts-cache";
     setCacheBase(cacheBase);
     // 初始化 JSON 缓存（索引与 MP3 同目录）
     const cacheDir = this.settings.ttsCacheDir || cacheBase;
@@ -409,10 +410,10 @@ export default class KuaifanyiPlugin extends Plugin {
       this.settings.providerKeys[this.settings.apiProvider] = this.settings.apiKey;
       dirty = true;
     }
-    delete (this.settings as any).volcanoCluster;
-    delete (this.settings as any).ttsBackend;
-    delete (this.settings as any).targetLang;
-    delete (this.settings as any).systemPrompt;
+    delete (this.settings as unknown as Record<string, unknown>).volcanoCluster;
+    delete (this.settings as unknown as Record<string, unknown>).ttsBackend;
+    delete (this.settings as unknown as Record<string, unknown>).targetLang;
+    delete (this.settings as unknown as Record<string, unknown>).systemPrompt;
     // 迁移：旧版无效音色 ID 自动纠正为默认
     if (this.settings.volcanoVoice === "zh_female_qingxin") {
       this.settings.volcanoVoice = DEFAULT_SETTINGS.volcanoVoice;
@@ -671,8 +672,8 @@ class KuaifanyiSettingTab extends PluginSettingTab {
         .addToggle((tg) => tg.setValue(this.plugin.settings.ttsCacheEnabled)
           .onChange(async (v) => { this.plugin.settings.ttsCacheEnabled = v; await this.plugin.saveSettings(); }));
 
-      const vaultPath = (this.plugin.app.vault.adapter as any).basePath || ".";
-      const configDir = (this.plugin.app.vault as any).configDir || ".obsidian";
+      const vaultPath = (this.plugin.app.vault.adapter as unknown as { basePath: string }).basePath || ".";
+      const configDir = this.plugin.app.vault.configDir || ".obsidian";
       const defaultCacheDir = vaultPath + "/" + configDir + "/plugins/kuaifanyi/tts-cache";
       new Setting(containerEl).setName("缓存目录").setDesc(`存放音频文件，默认 ${defaultCacheDir}`)
         .addText((t) => t.setPlaceholder(defaultCacheDir)

@@ -8,12 +8,12 @@ function sha256Hex(data: string): string {
 }
 
 /** HMAC-SHA256 返回 raw Buffer，用于密钥派生链 */
-function hmacBuf(key: any, data: string): Buffer {
+function hmacBuf(key: string | Buffer, data: string): Buffer {
   return crypto.createHmac("sha256", key).update(data, "utf-8").digest();
 }
 
 /** HMAC-SHA256 返回 hex string（仅用于最终签名） */
-function hmacHex(key: any, data: string): string {
+function hmacHex(key: string | Buffer, data: string): string {
   return crypto.createHmac("sha256", key).update(data, "utf-8").digest("hex");
 }
 
@@ -51,11 +51,9 @@ async function signedGet(
 
   const auth = `${ALGORITHM} Credential=${ak}/${credScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
 
-  const crHash = sha256Hex(canonicalRequest);
-  const stsHash = sha256Hex(stringToSign);
-
   // requestUrl 优先（Obsidian 推荐），失败回退 fetch
-  let status = 500, json: any = null, err: string | undefined;
+  let status = 500, err: string | undefined;
+  let json: Record<string, unknown> | null = null;
   try {
     const resp = await requestUrl({
       url: `https://${host}/?${query}`, method: "GET",
@@ -97,10 +95,10 @@ export async function fetchVolcanoUsage(ak: string, sk: string, appId: string, s
   try {
     const q = `Action=UsageMonitoring&AppID=${appId}&End=${end}&Mode=daily&ResourceID=volc.seedtts.default&Start=${start}&Version=2021-08-30`;
     const result = await signedGet("open.volcengineapi.com", "speech_saas_prod", "cn-north-1", q, ak, sk);
-    if (result.status !== 200 || !result.json || result.json?.status !== "success") return null;
-    const um = result.json?.data?.usage_monitoring;
+    if (result.status !== 200 || !result.json || (result.json as Record<string, unknown>).status !== "success") return null;
+    const um = (result.json as { data?: { usage_monitoring?: Array<{ value?: number }> } })?.data?.usage_monitoring;
     if (!Array.isArray(um)) return null;
-    return um.reduce((s: number, x: any) => s + (x.value || 0), 0);
+    return um.reduce((s: number, x: { value?: number }) => s + (x.value || 0), 0);
   } catch { return null; }
 }
 

@@ -22,6 +22,12 @@ interface CacheIndex {
   entries: Record<string, CacheEntry>;
 }
 
+function isCacheIndex(obj: unknown): obj is CacheIndex {
+  return typeof obj === "object" && obj !== null
+    && "version" in obj && (obj as Record<string, unknown>).version === 1
+    && "entries" in obj && typeof (obj as Record<string, unknown>).entries === "object";
+}
+
 export class CacheStore {
   private index: CacheIndex;
   private indexPath: string;
@@ -37,8 +43,8 @@ export class CacheStore {
     try {
       if (fs.existsSync(this.indexPath)) {
         const raw = fs.readFileSync(this.indexPath, "utf-8");
-        const parsed = JSON.parse(raw);
-        if (parsed && parsed.version === 1 && parsed.entries) {
+        const parsed: unknown = JSON.parse(raw);
+        if (isCacheIndex(parsed)) {
           return parsed;
         }
       }

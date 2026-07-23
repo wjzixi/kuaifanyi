@@ -31,6 +31,11 @@ export async function fetchBalance(settings: KuaifanyiSettings): Promise<string 
 }
 
 // ---- SSE 流式请求 ----
+interface SseChunk {
+  usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+  choices?: Array<{ delta?: { content?: string } }>;
+}
+
 async function fetchStream(
   apiUrl: string, apiKey: string, model: string,
   systemPrompt: string, userText: string,
@@ -66,7 +71,7 @@ async function fetchStream(
       const data = trimmed.slice(5).trim();
       if (data === "[DONE]") continue;
       try {
-        const parsed = JSON.parse(data);
+        const parsed = JSON.parse(data) as SseChunk;
         // 末尾的 usage 块（stream_options.include_usage）
         if (parsed.usage) {
           const u = parsed.usage;
@@ -131,7 +136,8 @@ export async function fetchModels(settings: KuaifanyiSettings): Promise<string[]
     headers: { Authorization: `Bearer ${settings.apiKey}` },
   });
   if (resp.status !== 200) throw new Error(`获取模型列表失败 (${resp.status})`);
-  let models = (resp.json.data || []).map((m: any) => m.id || m.model || m.name).filter(Boolean).sort();
+  const raw = (resp.json as { data?: Array<{ id?: string; model?: string; name?: string }> }).data || [];
+  let models = raw.map((m) => m.id || m.model || m.name || "").filter(Boolean).sort();
   const filter = PROVIDER_MODEL_FILTERS[settings.apiProvider];
   if (filter) models = models.filter((m: string) => filter.test(m));
   // 只保留最新 10 个模型
