@@ -53,7 +53,6 @@ async function signedGet(
 
   const crHash = sha256Hex(canonicalRequest);
   const stsHash = sha256Hex(stringToSign);
-  console.debug("[volc signing]", { scope: credScope, crHash: crHash.slice(0, 12), stsHash: stsHash.slice(0, 12) });
 
   // requestUrl 优先（Obsidian 推荐），失败回退 fetch
   let status = 500, json: any = null, err: string | undefined;

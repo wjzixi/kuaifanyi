@@ -42,7 +42,8 @@ export default class KuaifanyiPlugin extends Plugin {
     const cacheBase = (this.app.vault.adapter as any).basePath + "/" + configDir + "/plugins/kuaifanyi/tts-cache";
     setCacheBase(cacheBase);
     // 初始化 SQLite 缓存数据库
-    await initCacheDB(cacheBase + "/cache.db");
+    const pluginDir = (this.app.vault.adapter as any).basePath + "/" + configDir + "/plugins/kuaifanyi";
+    await initCacheDB(cacheBase + "/cache.db", pluginDir);
 
     if (this.settings.apiKey) void this.tryFetchModels();
     // 启动时拉一次官方数据，避免显示落盘残留
@@ -461,7 +462,7 @@ class TypeWriter {
 class KuaifanyiSettingTab extends PluginSettingTab {
   plugin: KuaifanyiPlugin;
 
-  constructor(app: any, plugin: KuaifanyiPlugin) { super(app, plugin); this.plugin = plugin; }
+  constructor(app: import("obsidian").App, plugin: KuaifanyiPlugin) { super(app, plugin); this.plugin = plugin; }
 
   getSettingDefinitions(): ReturnType<PluginSettingTab["getSettingDefinitions"]> {
     // Declarative API not adopted yet — display() handles dynamic UI

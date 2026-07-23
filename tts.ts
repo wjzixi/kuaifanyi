@@ -65,7 +65,7 @@ export function trackMonthly(s: KuaifanyiSettings, chars: number): number {
 export function cleanForSpeech(text: string): string {
   return text
     .replace(/https?:\/\/\S+/g, " ")          // URL 不念
-    .replace(/[【】《》「」『』""''*`#<>[]{}()（）~^|\\_]/g, " ") // 装饰符号
+    .replace(/[【】《》「」『』""''*`#<>[]{}()（）~^|\\_]/g, " ")
     .replace(/[—–-]{2,}/g, "，")               // 长破折号→逗号停顿
     .replace(/\s{2,}/g, " ")
     .trim();

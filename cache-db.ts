@@ -48,17 +48,19 @@ export interface CacheStats {
 export class CacheDB {
   private db: SqlJsDatabase | null = null;
   private dbPath: string;
+  private pluginDir: string;
   private dirty = false;
 
-  constructor(dbPath: string) {
+  constructor(dbPath: string, pluginDir: string) {
     this.dbPath = dbPath;
+    this.pluginDir = pluginDir;
   }
 
   /** 打开数据库，不存在则创建 */
   async open(): Promise<void> {
     if (!SQL) {
       // 加载 sql.js WASM — 从插件目录读取 wasm 文件
-      const wasmPath = path.join(__dirname, "sql-wasm.wasm");
+      const wasmPath = path.join(this.pluginDir, "sql-wasm.wasm");
       if (fs.existsSync(wasmPath)) {
         const wasmBin = fs.readFileSync(wasmPath);
         SQL = await initSqlJs({ wasmBinary: wasmBin });
@@ -269,12 +271,12 @@ export class CacheDB {
     } catch { /* Expected */ }
   }
 
-  private saveTimer: ReturnType<typeof setTimeout> | null = null;
+  private saveTimer: number | null = null;
 
   /** 延迟保存（合并多次写入） */
   private maybeSave(): void {
-    if (this.saveTimer) clearTimeout(this.saveTimer);
-    this.saveTimer = setTimeout(() => {
+    if (this.saveTimer) window.clearTimeout(this.saveTimer);
+    this.saveTimer = window.setTimeout(() => {
       this.save();
       this.saveTimer = null;
     }, 2000);
@@ -282,7 +284,7 @@ export class CacheDB {
 
   /** 立即保存并关闭 */
   close(): void {
-    if (this.saveTimer) { clearTimeout(this.saveTimer); this.saveTimer = null; }
+    if (this.saveTimer) { window.clearTimeout(this.saveTimer); this.saveTimer = null; }
     this.save();
     if (this.db) { this.db.close(); this.db = null; }
   }
@@ -291,19 +293,16 @@ export class CacheDB {
 /** 全局单例 */
 let _cacheDB: CacheDB | null = null;
 
-export function getCacheDB(dbPath?: string): CacheDB {
-  if (!_cacheDB && dbPath) {
-    _cacheDB = new CacheDB(dbPath);
-  }
+export function getCacheDB(): CacheDB {
   if (!_cacheDB) {
-    throw new Error("CacheDB 未初始化，请先调用 initCacheDB(path)");
+    throw new Error("CacheDB 未初始化，请先调用 initCacheDB(path, pluginDir)");
   }
   return _cacheDB;
 }
 
-export async function initCacheDB(dbPath: string): Promise<CacheDB> {
+export async function initCacheDB(dbPath: string, pluginDir: string): Promise<CacheDB> {
   if (_cacheDB) _cacheDB.close();
-  _cacheDB = new CacheDB(dbPath);
+  _cacheDB = new CacheDB(dbPath, pluginDir);
   await _cacheDB.open();
   return _cacheDB;
 }
