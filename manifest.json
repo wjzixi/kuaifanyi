@@ -1,6 +1,6 @@
 {
   "id": "kuaifanyi",
-  "name": "快翻译",
+  "name": "Kuaifanyi",
   "version": "1.0.0",
   "minAppVersion": "1.0.0",
   "description": "选中即译：短词词典模式+长句流式翻译，AI 解释并行渲染，豆包神经语音朗读（支持声音克隆），兼容 DeepSeek 等 OpenAI 格式 API",
