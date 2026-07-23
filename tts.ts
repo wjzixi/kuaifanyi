@@ -3,7 +3,7 @@ import type { KuaifanyiSettings } from "./settings";
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
-import { getCacheDB } from "./cache-db";
+import { getCacheStore } from "./cache-store";
 
 // ============ 火山豆包语音 ============
 const VOLCANO_TTS_URL = "https://openspeech.bytedance.com/api/v1/tts";
@@ -132,7 +132,7 @@ function loadFromCache(text: string, voice: string, dir: string): Blob | null {
   if (!text || !voice) return null;
   const key = cacheKey(text, voice);
   try {
-    const db = getCacheDB();
+    const db = getCacheStore();
     const audioPath = db?.getAudio(key) ?? null;
     if (audioPath && fs.existsSync(audioPath)) {
       const buf = fs.readFileSync(audioPath);
@@ -153,7 +153,7 @@ async function saveToCache(text: string, voice: string, blob: Blob, dir: string)
     const buf = await blob.arrayBuffer();
     fs.writeFileSync(fp, Buffer.from(buf));
     // 写入 SQLite 索引
-    const db = getCacheDB();
+    const db = getCacheStore();
     db?.setAudio(cacheKey(text, voice), text, voice, fp, Buffer.from(buf).length);
   } catch { /* Expected */ }
 }

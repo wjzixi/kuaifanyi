@@ -3,5 +3,6 @@ node_modules/
 .DS_Store
 dist/
 .env
-# SQLite 缓存数据库（运行时生成）
+# 缓存数据库（运行时生成）
+cache-index.json
 cache.db

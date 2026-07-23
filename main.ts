@@ -6,7 +6,7 @@ import { DEFAULT_SETTINGS, API_PRESETS, ApiProvider } from "./settings";
 import { streamTranslate, streamExplain, streamDictLookup, fetchModels, fetchBalance, usageStats, isWord } from "./translator";
 import { speak, stopSpeaking, getChineseVoices, VOLCANO_VOICES, VOLCANO_MONTHLY_QUOTA, setTtsStateCallback, TtsState, clearTtsCache, setCacheBase } from "./tts";
 import { fetchVolcanoBalance, fetchVolcanoUsage, fetchAliyunBalance } from "./volc-billing";
-import { initCacheDB, closeCacheDB, getCacheDB } from "./cache-db";
+import { initCacheStore, closeCacheStore } from "./cache-store";
 
 const PROVIDERS: ApiProvider[] = ["deepseek", "qwen", "doubao", "kimi", "zhipu", "custom"];
 
@@ -41,9 +41,8 @@ export default class KuaifanyiPlugin extends Plugin {
     const configDir = (this.app.vault as any).configDir || ".obsidian";
     const cacheBase = (this.app.vault.adapter as any).basePath + "/" + configDir + "/plugins/kuaifanyi/tts-cache";
     setCacheBase(cacheBase);
-    // 初始化 SQLite 缓存数据库（非致命：失败不影响插件功能）
-    const pluginDir = (this.app.vault.adapter as any).basePath + "/" + configDir + "/plugins/kuaifanyi";
-    try { await initCacheDB(cacheBase + "/cache.db", pluginDir); } catch { /* 缓存不可用，翻译/TTS 仍能正常工作 */ }
+    // 初始化 JSON 缓存
+    initCacheStore(cacheBase + "/cache-index.json");
 
     if (this.settings.apiKey) void this.tryFetchModels();
     // 启动时拉一次官方数据，避免显示落盘残留
@@ -77,7 +76,7 @@ export default class KuaifanyiPlugin extends Plugin {
   onunload(): void {
     stopSpeaking();
     this.hidePopup();
-    closeCacheDB();
+    closeCacheStore();
   }
 
   private onSelection(evt: MouseEvent): void {

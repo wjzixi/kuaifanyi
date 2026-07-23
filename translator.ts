@@ -2,7 +2,7 @@ import { requestUrl } from "obsidian";
 import type { KuaifanyiSettings } from "./settings";
 import { API_PRESETS } from "./settings";
 import crypto from "crypto";
-import { getCacheDB } from "./cache-db";
+import { getCacheStore } from "./cache-store";
 
 // ---- 用量统计（最近一次请求） ----
 export interface UsageInfo { prompt: number; completion: number; total: number; }
@@ -147,7 +147,7 @@ export function streamDictLookup(
   const model = settings.translateModel || getDefaultModel(settings);
   const key = cacheKey([settings.apiProvider, model, "dict", text]);
 
-  const db = getCacheDB();
+  const db = getCacheStore();
   const cached = db?.getText(key) ?? null;
   if (cached) {
     let i = 0;
@@ -194,7 +194,7 @@ export function streamTranslate(
   const model = settings.translateModel || getDefaultModel(settings);
   const key = cacheKey([settings.apiProvider, model, "translate", targetLang, text]);
 
-  const db = getCacheDB();
+  const db = getCacheStore();
   const cached = db?.getText(key) ?? null;
   if (cached) {
     let i = 0;
@@ -224,7 +224,7 @@ export function streamExplain(
   const model = settings.explainModel || "deepseek-v4-flash";
   const key = cacheKey([settings.apiProvider, model, "explain", text]);
 
-  const db = getCacheDB();
+  const db = getCacheStore();
   const cached = db?.getText(key) ?? null;
   if (cached) {
     let i = 0;
