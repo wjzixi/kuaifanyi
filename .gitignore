@@ -3,8 +3,5 @@ node_modules/
 .DS_Store
 dist/
 .env
-# sql.js 运行时文件（构建时从 node_modules 拷贝）
-sql-wasm.js
-sql-wasm.wasm
 # SQLite 缓存数据库（运行时生成）
 cache.db
