@@ -148,7 +148,7 @@ export function streamDictLookup(
   const key = cacheKey([settings.apiProvider, model, "dict", text]);
 
   const db = getCacheDB();
-  const cached = db.getText(key);
+  const cached = db?.getText(key) ?? null;
   if (cached) {
     let i = 0;
     const typewrite = () => {
@@ -182,7 +182,7 @@ export function streamDictLookup(
 - 只输出上述格式，不要多余内容。`;
 
   return fetchStream(getApiUrl(settings), settings.apiKey, model, prompt, text, onChunk)
-    .then((result) => { db.setText(key, "dict", text, result, settings.apiProvider, model); return result; });
+    .then((result) => { db?.setText(key, "dict", text, result, settings.apiProvider, model); return result; });
 }
 
 // ---- 流式翻译（SQLite 缓存） ----
@@ -195,7 +195,7 @@ export function streamTranslate(
   const key = cacheKey([settings.apiProvider, model, "translate", targetLang, text]);
 
   const db = getCacheDB();
-  const cached = db.getText(key);
+  const cached = db?.getText(key) ?? null;
   if (cached) {
     let i = 0;
     const typewrite = () => {
@@ -213,7 +213,7 @@ export function streamTranslate(
     getApiUrl(settings), settings.apiKey, model,
     `你是一个专业的翻译助手。将用户输入的文本翻译为${targetLang}。只输出翻译结果。`,
     text, (chunk) => onChunk(chunk)
-  ).then((result) => { db.setText(key, "translate", text, result, settings.apiProvider, model); return result; });
+  ).then((result) => { db?.setText(key, "translate", text, result, settings.apiProvider, model); return result; });
 }
 
 // ---- 流式解释（SQLite 缓存） ----
@@ -225,7 +225,7 @@ export function streamExplain(
   const key = cacheKey([settings.apiProvider, model, "explain", text]);
 
   const db = getCacheDB();
-  const cached = db.getText(key);
+  const cached = db?.getText(key) ?? null;
   if (cached) {
     let i = 0;
     const typewrite = () => {
@@ -239,7 +239,7 @@ export function streamExplain(
     getApiUrl(settings), settings.apiKey, model,
     "你是一个简洁的知识助手。用一段话解释用户选中的内容，包含背景、核心概念和关键信息。回答简洁，不超过300字。",
     text, (chunk) => onChunk(chunk)
-  ).then((result) => { db.setText(key, "explain", text, result, settings.apiProvider, model); return result; });
+  ).then((result) => { db?.setText(key, "explain", text, result, settings.apiProvider, model); return result; });
 }
 
 export function getApiUrl(settings: KuaifanyiSettings): string {

@@ -41,9 +41,9 @@ export default class KuaifanyiPlugin extends Plugin {
     const configDir = (this.app.vault as any).configDir || ".obsidian";
     const cacheBase = (this.app.vault.adapter as any).basePath + "/" + configDir + "/plugins/kuaifanyi/tts-cache";
     setCacheBase(cacheBase);
-    // 初始化 SQLite 缓存数据库
+    // 初始化 SQLite 缓存数据库（非致命：失败不影响插件功能）
     const pluginDir = (this.app.vault.adapter as any).basePath + "/" + configDir + "/plugins/kuaifanyi";
-    await initCacheDB(cacheBase + "/cache.db", pluginDir);
+    try { await initCacheDB(cacheBase + "/cache.db", pluginDir); } catch { /* 缓存不可用，翻译/TTS 仍能正常工作 */ }
 
     if (this.settings.apiKey) void this.tryFetchModels();
     // 启动时拉一次官方数据，避免显示落盘残留

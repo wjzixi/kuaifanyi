@@ -293,10 +293,7 @@ export class CacheDB {
 /** 全局单例 */
 let _cacheDB: CacheDB | null = null;
 
-export function getCacheDB(): CacheDB {
-  if (!_cacheDB) {
-    throw new Error("CacheDB 未初始化，请先调用 initCacheDB(path, pluginDir)");
-  }
+export function getCacheDB(): CacheDB | null {
   return _cacheDB;
 }
 

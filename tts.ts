@@ -133,7 +133,7 @@ function loadFromCache(text: string, voice: string, dir: string): Blob | null {
   const key = cacheKey(text, voice);
   try {
     const db = getCacheDB();
-    const audioPath = db.getAudio(key);
+    const audioPath = db?.getAudio(key) ?? null;
     if (audioPath && fs.existsSync(audioPath)) {
       const buf = fs.readFileSync(audioPath);
       const ab = new ArrayBuffer(buf.length);
@@ -154,7 +154,7 @@ async function saveToCache(text: string, voice: string, blob: Blob, dir: string)
     fs.writeFileSync(fp, Buffer.from(buf));
     // 写入 SQLite 索引
     const db = getCacheDB();
-    db.setAudio(cacheKey(text, voice), text, voice, fp, Buffer.from(buf).length);
+    db?.setAudio(cacheKey(text, voice), text, voice, fp, Buffer.from(buf).length);
   } catch { /* Expected */ }
 }
 
