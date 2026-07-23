@@ -7,12 +7,21 @@
     "dev": "node esbuild.config.cjs",
     "build": "tsc -noEmit -skipLibCheck && node esbuild.config.cjs production"
   },
-  "keywords": ["obsidian", "plugin", "translate", "tts"],
+  "keywords": [
+    "obsidian",
+    "plugin",
+    "translate",
+    "tts"
+  ],
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^20.0.0",
+    "@types/sql.js": "^1.4.11",
     "esbuild": "^0.20.0",
     "obsidian": "latest",
     "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "sql.js": "^1.14.1"
   }
 }

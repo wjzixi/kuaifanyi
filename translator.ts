@@ -2,8 +2,7 @@ import { requestUrl } from "obsidian";
 import type { KuaifanyiSettings } from "./settings";
 import { API_PRESETS } from "./settings";
 import crypto from "crypto";
-import fs from "fs";
-import path from "path";
+import { getCacheDB } from "./cache-db";
 
 // ---- 用量统计（最近一次请求） ----
 export interface UsageInfo { prompt: number; completion: number; total: number; }
@@ -91,29 +90,8 @@ async function fetchStream(
 
 // ---- 工具函数 ----
 
-// 翻译缓存（文本）
-function translationCacheDir(settings: KuaifanyiSettings): string {
-  const dir = settings.ttsCacheDir || path.join(".obsidian", "plugins", "kuaifanyi", "tts-cache") /* #configDir */;
-  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-  return dir;
-}
-
 function cacheKey(parts: string[]): string {
-  return crypto.createHash("md5").update(parts.join("|")).digest("hex") + ".txt";
-}
-
-function loadTextCache(dir: string, key: string): string | null {
-  try {
-    const fp = path.join(dir, key);
-    if (fs.existsSync(fp)) return fs.readFileSync(fp, "utf-8");
-  } catch { /* Expected */ }
-  return null;
-}
-
-function saveTextCache(dir: string, key: string, text: string): void {
-  try {
-    fs.writeFileSync(path.join(dir, key), text, "utf-8");
-  } catch { /* Expected */ }
+  return crypto.createHash("md5").update(parts.join("|")).digest("hex");
 }
 
 export function isChinese(text: string): boolean {
@@ -161,16 +139,16 @@ export async function fetchModels(settings: KuaifanyiSettings): Promise<string[]
   return models;
 }
 
-// ---- 词典式查词（模仿有道，带缓存） ----
+// ---- 词典式查词（SQLite 缓存） ----
 export function streamDictLookup(
   text: string, settings: KuaifanyiSettings,
   onChunk: (text: string) => void
 ): Promise<string> {
   const model = settings.translateModel || getDefaultModel(settings);
-  const dir = translationCacheDir(settings);
   const key = cacheKey([settings.apiProvider, model, "dict", text]);
 
-  const cached = loadTextCache(dir, key);
+  const db = getCacheDB();
+  const cached = db.getText(key);
   if (cached) {
     let i = 0;
     const typewrite = () => {
@@ -204,22 +182,21 @@ export function streamDictLookup(
 - 只输出上述格式，不要多余内容。`;
 
   return fetchStream(getApiUrl(settings), settings.apiKey, model, prompt, text, onChunk)
-    .then((result) => { saveTextCache(dir, key, result); return result; });
+    .then((result) => { db.setText(key, "dict", text, result, settings.apiProvider, model); return result; });
 }
 
-// ---- 流式翻译（带缓存） ----
+// ---- 流式翻译（SQLite 缓存） ----
 export function streamTranslate(
   text: string, settings: KuaifanyiSettings,
   onChunk: (text: string) => void
 ): Promise<string> {
   const targetLang = detectTargetLang(text);
   const model = settings.translateModel || getDefaultModel(settings);
-  const dir = translationCacheDir(settings);
   const key = cacheKey([settings.apiProvider, model, "translate", targetLang, text]);
 
-  const cached = loadTextCache(dir, key);
+  const db = getCacheDB();
+  const cached = db.getText(key);
   if (cached) {
-    // 缓存命中：模拟流式输出
     let i = 0;
     const typewrite = () => {
       if (i < cached.length) {
@@ -236,19 +213,19 @@ export function streamTranslate(
     getApiUrl(settings), settings.apiKey, model,
     `你是一个专业的翻译助手。将用户输入的文本翻译为${targetLang}。只输出翻译结果。`,
     text, (chunk) => onChunk(chunk)
-  ).then((result) => { saveTextCache(dir, key, result); return result; });
+  ).then((result) => { db.setText(key, "translate", text, result, settings.apiProvider, model); return result; });
 }
 
-// ---- 流式解释（带缓存） ----
+// ---- 流式解释（SQLite 缓存） ----
 export function streamExplain(
   text: string, settings: KuaifanyiSettings,
   onChunk: (text: string) => void
 ): Promise<string> {
   const model = settings.explainModel || "deepseek-v4-flash";
-  const dir = translationCacheDir(settings);
   const key = cacheKey([settings.apiProvider, model, "explain", text]);
 
-  const cached = loadTextCache(dir, key);
+  const db = getCacheDB();
+  const cached = db.getText(key);
   if (cached) {
     let i = 0;
     const typewrite = () => {
@@ -262,7 +239,7 @@ export function streamExplain(
     getApiUrl(settings), settings.apiKey, model,
     "你是一个简洁的知识助手。用一段话解释用户选中的内容，包含背景、核心概念和关键信息。回答简洁，不超过300字。",
     text, (chunk) => onChunk(chunk)
-  ).then((result) => { saveTextCache(dir, key, result); return result; });
+  ).then((result) => { db.setText(key, "explain", text, result, settings.apiProvider, model); return result; });
 }
 
 export function getApiUrl(settings: KuaifanyiSettings): string {

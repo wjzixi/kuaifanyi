@@ -3,6 +3,7 @@ import type { KuaifanyiSettings } from "./settings";
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
+import { getCacheDB } from "./cache-db";
 
 // ============ 火山豆包语音 ============
 const VOLCANO_TTS_URL = "https://openspeech.bytedance.com/api/v1/tts";
@@ -122,14 +123,19 @@ function cacheName(text: string, voice: string, dir: string): string {
   return path.join(dir, hash + ".mp3");
 }
 
-/** 从缓存加载音频，成功返回 blob，失败返回 null */
+function cacheKey(text: string, voice: string): string {
+  return crypto.createHash("md5").update(text).update(voice).digest("hex");
+}
+
+/** 从缓存加载音频（SQLite 索引 + 磁盘文件），成功返回 blob，失败返回 null */
 function loadFromCache(text: string, voice: string, dir: string): Blob | null {
   if (!text || !voice) return null;
-  const fp = cacheName(text, voice, dir);
+  const key = cacheKey(text, voice);
   try {
-    if (fs.existsSync(fp)) {
-      const buf = fs.readFileSync(fp);
-      // Node Buffer → 标准 ArrayBuffer，Electron 渲染进程才认
+    const db = getCacheDB();
+    const audioPath = db.getAudio(key);
+    if (audioPath && fs.existsSync(audioPath)) {
+      const buf = fs.readFileSync(audioPath);
       const ab = new ArrayBuffer(buf.length);
       const view = new Uint8Array(ab);
       view.set(buf);
@@ -139,13 +145,16 @@ function loadFromCache(text: string, voice: string, dir: string): Blob | null {
   return null;
 }
 
-/** 保存音频到缓存（异步写入，返回 Promise 确保落盘） */
+/** 保存音频到磁盘 + SQLite 索引 */
 async function saveToCache(text: string, voice: string, blob: Blob, dir: string): Promise<void> {
   if (!text || !voice || !blob) return;
   try {
     const fp = cacheName(text, voice, dir);
     const buf = await blob.arrayBuffer();
     fs.writeFileSync(fp, Buffer.from(buf));
+    // 写入 SQLite 索引
+    const db = getCacheDB();
+    db.setAudio(cacheKey(text, voice), text, voice, fp, Buffer.from(buf).length);
   } catch { /* Expected */ }
 }
 
