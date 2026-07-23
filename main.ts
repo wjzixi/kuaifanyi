@@ -37,12 +37,13 @@ export default class KuaifanyiPlugin extends Plugin {
     // TTS 状态回调
     setTtsStateCallback((s) => this.setTtsState(s));
 
-    // 缓存基础路径（限在库内）
+    // 缓存基础路径
     const configDir = (this.app.vault as any).configDir || ".obsidian";
     const cacheBase = (this.app.vault.adapter as any).basePath + "/" + configDir + "/plugins/kuaifanyi/tts-cache";
     setCacheBase(cacheBase);
-    // 初始化 JSON 缓存
-    initCacheStore(cacheBase + "/cache-index.json");
+    // 初始化 JSON 缓存（索引与 MP3 同目录）
+    const cacheDir = this.settings.ttsCacheDir || cacheBase;
+    initCacheStore(cacheDir + "/cache-index.json");
 
     if (this.settings.apiKey) void this.tryFetchModels();
     // 启动时拉一次官方数据，避免显示落盘残留

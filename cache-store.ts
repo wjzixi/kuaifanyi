@@ -87,7 +87,7 @@ export class CacheStore {
     return entry.audio_path || null;
   }
 
-  /** 写入文本缓存 */
+  /** 写入文本缓存（立即持久化） */
   setText(keyHash: string, type: "translate" | "explain" | "dict",
     sourceText: string, resultText: string, provider = "", model = ""): void {
     const existing = this.index.entries[keyHash];
@@ -105,10 +105,10 @@ export class CacheStore {
       accessed_at: Date.now(),
       hit_count: (existing?.hit_count || 0) + 1,
     };
-    this.maybeSave();
+    this.save();
   }
 
-  /** 写入音频缓存 */
+  /** 写入音频缓存（立即持久化） */
   setAudio(keyHash: string, sourceText: string, voice: string,
     audioPath: string, audioSize: number, provider = ""): void {
     const existing = this.index.entries[keyHash];
@@ -126,7 +126,7 @@ export class CacheStore {
       accessed_at: Date.now(),
       hit_count: (existing?.hit_count || 0) + 1,
     };
-    this.maybeSave();
+    this.save();
   }
 
   /** 删除单条 */
