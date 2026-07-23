@@ -93,7 +93,7 @@ async function fetchStream(
 
 // 翻译缓存（文本）
 function translationCacheDir(settings: KuaifanyiSettings): string {
-  const dir = settings.ttsCacheDir || path.join(process.env.USERPROFILE || process.env.HOME || ".", "kuaifanyi-tts-cache");
+  const dir = settings.ttsCacheDir || path.join(".obsidian", "plugins", "kuaifanyi", "tts-cache");
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   return dir;
 }

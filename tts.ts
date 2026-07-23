@@ -91,15 +91,28 @@ function uuid(): string {
 }
 
 // ---- 语音缓存 ----
+let _cacheBase = "";
+
+/** 设置缓存基础目录（由 main.ts 在 onload 时调用，限在库目录内） */
+export function setCacheBase(dir: string): void {
+  _cacheBase = dir;
+}
 
 function resolveCacheDir(settings: KuaifanyiSettings): string {
   if (settings.ttsCacheDir) return settings.ttsCacheDir;
-  // 默认用户目录下
-  const home = process.env.USERPROFILE || process.env.HOME || ".";
-  return path.join(home, "kuaifanyi-tts-cache");
+  // 默认库插件目录下，不读取用户环境变量
+  return _cacheBase || path.join(".", "kuaifanyi-tts-cache");
 }
 
+function safeFS(dir: string): boolean {
+  // 安全检查：缓存目录必须在库范围内
+  if (_cacheBase && !dir.startsWith(_cacheBase)) return false;
+  return true;
+}
+export { safeFS };
+
 function ensureCacheDir(dir: string): string {
+  if (!safeFS(dir)) return "";
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   return dir;
 }

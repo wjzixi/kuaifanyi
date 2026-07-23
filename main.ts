@@ -4,7 +4,7 @@ import {
 import type { KuaifanyiSettings } from "./settings";
 import { DEFAULT_SETTINGS, API_PRESETS, ApiProvider } from "./settings";
 import { streamTranslate, streamExplain, streamDictLookup, fetchModels, fetchBalance, usageStats, isWord } from "./translator";
-import { speak, stopSpeaking, getChineseVoices, VOLCANO_VOICES, VOLCANO_MONTHLY_QUOTA, setTtsStateCallback, TtsState, clearTtsCache } from "./tts";
+import { speak, stopSpeaking, getChineseVoices, VOLCANO_VOICES, VOLCANO_MONTHLY_QUOTA, setTtsStateCallback, TtsState, clearTtsCache, setCacheBase } from "./tts";
 import { fetchVolcanoBalance, fetchVolcanoUsage, fetchAliyunBalance } from "./volc-billing";
 
 const PROVIDERS: ApiProvider[] = ["deepseek", "qwen", "doubao", "kimi", "zhipu", "custom"];
@@ -35,6 +35,9 @@ export default class KuaifanyiPlugin extends Plugin {
 
     // TTS 状态回调
     setTtsStateCallback((s) => this.setTtsState(s));
+
+    // 缓存基础路径（限在库内：.obsidian/plugins/kuaifanyi/tts-cache）
+    setCacheBase((this.app.vault.adapter as any).basePath + "/.obsidian/plugins/kuaifanyi/tts-cache");
 
     if (this.settings.apiKey) this.tryFetchModels();
     // 启动时拉一次官方数据，避免显示落盘残留
@@ -464,9 +467,9 @@ class KuaifanyiSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     const models = this.plugin.cachedModels[this.plugin.settings.apiProvider] || [];
     containerEl.empty();
-    containerEl.createEl("h2", { text: "快翻译 - 设置" });
+    new Setting(containerEl).setHeading().setName("快翻译 - 设置");
 
-    containerEl.createEl("h3", { text: "🔌 翻译 API" });
+    new Setting(containerEl).setHeading().setName("🔌 翻译 API");
     new Setting(containerEl).setName("API 提供商").setDesc("选择翻译 API 服务商")
       .addDropdown((dd) => {
         for (const p of PROVIDERS) dd.addOption(p, API_PRESETS[p].name);
@@ -518,7 +521,7 @@ class KuaifanyiSettingTab extends PluginSettingTab {
     }
 
     // 模型选择
-    containerEl.createEl("h3", { text: "🤖 模型选择" });
+    new Setting(containerEl).setHeading().setName("🤖 模型选择");
     if (models.length > 0) {
       new Setting(containerEl).setName("翻译模型").setDesc("用于翻译/查词的模型")
         .addDropdown((dd) => {
@@ -545,13 +548,13 @@ class KuaifanyiSettingTab extends PluginSettingTab {
     }
 
     // ---- 翻译 ----
-    containerEl.createEl("h3", { text: "🌐 翻译" });
+    new Setting(containerEl).setHeading().setName("🌐 翻译");
     new Setting(containerEl).setName("分段大小").setDesc("长文本每段最大字符数（短词自动走词典模式，方向中英自动）")
       .addSlider((s) => s.setLimits(500, 8000, 500).setValue(this.plugin.settings.chunkSize)
         .setDynamicTooltip().onChange(async (v) => { this.plugin.settings.chunkSize = v; await this.plugin.saveSettings(); }));
 
     // ---- 触发方式 ----
-    containerEl.createEl("h3", { text: "⚡ 触发方式" });
+    new Setting(containerEl).setHeading().setName("⚡ 触发方式");
     new Setting(containerEl).setName("触发模式").setDesc("直接选中 | Ctrl+选中")
       .addDropdown((dd) => {
         dd.addOption("direct", "直接选中"); dd.addOption("ctrl", "Ctrl+选中");
@@ -573,7 +576,7 @@ class KuaifanyiSettingTab extends PluginSettingTab {
         .setDynamicTooltip().onChange(async (v) => { this.plugin.settings.triggerDebounce = v; await this.plugin.saveSettings(); }));
 
     // ---- 朗读 ----
-    containerEl.createEl("h3", { text: "🔊 朗读" });
+    new Setting(containerEl).setHeading().setName("🔊 朗读");
 
     new Setting(containerEl).setName("TTS 引擎").setDesc("豆包：火山引擎神经语音（接近真人） | 系统：本机离线语音")
       .addDropdown((dd) => {
@@ -656,7 +659,8 @@ class KuaifanyiSettingTab extends PluginSettingTab {
         .addToggle((tg) => tg.setValue(this.plugin.settings.ttsCacheEnabled)
           .onChange(async (v) => { this.plugin.settings.ttsCacheEnabled = v; await this.plugin.saveSettings(); }));
 
-      const defaultCacheDir = (process.env.USERPROFILE || process.env.HOME || ".") + "\\kuaifanyi-tts-cache";
+      const vaultPath = (this.plugin.app.vault.adapter as any).basePath || ".";
+      const defaultCacheDir = vaultPath + "/.obsidian/plugins/kuaifanyi/tts-cache";
       new Setting(containerEl).setName("缓存目录").setDesc(`存放音频文件，默认 ${defaultCacheDir}`)
         .addText((t) => t.setPlaceholder(defaultCacheDir)
           .setValue(this.plugin.settings.ttsCacheDir)
