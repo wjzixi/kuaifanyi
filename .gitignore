@@ -1,0 +1,8 @@
+node_modules/
+*.log
+.DS_Store
+dist/
+.env
+# 缓存数据库（运行时生成）
+cache-index.json
+cache.db

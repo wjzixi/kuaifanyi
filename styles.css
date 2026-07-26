@@ -1,0 +1,154 @@
+/* ======== 快翻译弹窗（对齐 Obsidian 原生 Popover 风格） ======== */
+
+.kfy-popup {
+  z-index: var(--layer-popover, 20);
+  position: absolute;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: var(--radius-m);
+  box-shadow: 0 2px 8px var(--background-modifier-box-shadow);
+  padding: var(--size-4-3) var(--size-4-4);
+  /* 宽度黄金比例默认，高度不限制（内容自适应），由 JS 保证不越出界面 */
+  width: min(460px, 90vw);
+  height: auto;
+  overflow: auto;
+  resize: both;
+  font-size: var(--font-ui-small);
+  font-family: var(--font-interface);
+  color: var(--text-normal);
+}
+
+.kfy-section {
+  margin-bottom: var(--size-4-3);
+}
+.kfy-section:last-child {
+  margin-bottom: 0;
+}
+
+/* 标签：对齐 Obsidian setting-item-description 的小号弱化文字 */
+.kfy-label {
+  font-size: var(--font-ui-smaller);
+  font-weight: var(--font-medium);
+  color: var(--text-muted);
+  margin-bottom: var(--size-4-1);
+  user-select: none;
+}
+
+/* 标签行（标签 + 语言指示器） */
+.kfy-section-hdr {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--size-4-1);
+}
+.kfy-section-hdr .kfy-label {
+  margin-bottom: 0;
+}
+
+/* 目标语言下拉：复用 Obsidian 原生 .dropdown 视觉（箭头/边框/hover/focus），仅做弹窗紧凑化 */
+.kfy-lang-select {
+  font-size: var(--font-ui-smaller);
+  height: 26px;
+  padding-top: 0;
+  padding-bottom: 0;
+  max-width: 130px;
+  cursor: pointer;
+}
+
+.kfy-lang-text {
+  font-size: 11px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.kfy-drag-handle {
+  cursor: grab;
+}
+.kfy-drag-handle:active {
+  cursor: grabbing;
+}
+
+/* 内容块：对齐 Obsidian 引用/代码内嵌块风格 */
+.kfy-text {
+  font-size: var(--font-ui-small);
+  line-height: var(--line-height-normal);
+  color: var(--text-normal);
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: var(--size-4-2) var(--size-4-3);
+  background: var(--background-secondary);
+  border-radius: var(--radius-s);
+  /* 允许常规文本选取（单击拖拽/双击选词/三击选段） */
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+}
+
+/* 按钮行：对齐 Obsidian 原生按钮 */
+.kfy-btn-row {
+  display: flex;
+  gap: var(--size-4-2);
+  justify-content: flex-end;
+  margin-top: var(--size-4-2);
+  align-items: center;
+}
+
+/* TTS 状态指示灯 + 文字（按钮左侧） */
+.kfy-tts-indicator-wrap {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-right: auto;
+}
+
+.kfy-tts-indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #888;
+  flex-shrink: 0;
+}
+
+.kfy-tts-indicator-text {
+  font-size: var(--font-ui-smaller);
+  color: var(--text-muted);
+}
+
+.kfy-btn-row button {
+  padding: var(--size-4-1) var(--size-4-3);
+  border: none;
+  border-radius: var(--radius-s);
+  background: var(--interactive-normal);
+  box-shadow: var(--input-shadow);
+  color: var(--text-normal);
+  cursor: pointer;
+  font-size: var(--font-ui-smaller);
+  font-family: var(--font-interface);
+  transition: background-color 0.15s ease;
+}
+
+.kfy-btn-row button:hover {
+  background: var(--interactive-hover);
+}
+
+.kfy-btn-row button:active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+/* 底部用量栏 */
+.kfy-usage {
+  margin-top: var(--size-4-2);
+  padding-top: var(--size-4-2);
+  border-top: 1px solid var(--background-modifier-border);
+  font-size: var(--font-ui-smaller);
+  color: var(--text-faint);
+  user-select: none;
+}
+
+.kfy-usage-line {
+  line-height: 1.6;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
