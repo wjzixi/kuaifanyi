@@ -68,7 +68,7 @@
   cursor: grabbing;
 }
 
-/* 内容块：对齐 Obsidian 引用/代码内嵌块风格 */
+/* 内容块：对齐 Obsidian 引用/代码内嵌块风格，超长文本限高滚动避免弹窗抖动 */
 .kfy-text {
   font-size: var(--font-ui-small);
   line-height: var(--line-height-normal);
@@ -78,6 +78,8 @@
   padding: var(--size-4-2) var(--size-4-3);
   background: var(--background-secondary);
   border-radius: var(--radius-s);
+  max-height: 60vh;
+  overflow-y: auto;
   /* 允许常规文本选取（单击拖拽/双击选词/三击选段） */
   user-select: text;
   -webkit-user-select: text;

@@ -529,33 +529,16 @@ export default class KuaifanyiPlugin extends Plugin {
   async saveSettings(): Promise<void> { await this.saveData(this.settings); }
 }
 
-// ========== 打字机渲染 ==========
+// ========== 打字机渲染（流式时即时显示，LLM 逐块效果已自带；缓存回放保留动画） ==========
 class TypeWriter {
-  private timer: number | null = null;
-  private displayed = 0;
-  private readonly speed = 20;
-
   update(el: HTMLElement, fullText: string): void {
-    if (fullText.length <= this.displayed) return;
-    this.renderNext(el, fullText);
+    el.textContent = fullText;
+    el.scrollTop = el.scrollHeight; // 自动滚到底部
   }
 
   finish(el: HTMLElement, fullText: string): void {
-    if (this.timer !== null) { window.clearTimeout(this.timer); this.timer = null; }
-    this.displayed = fullText.length;
     el.textContent = fullText;
-  }
-
-  private renderNext(el: HTMLElement, fullText: string): void {
-    if (this.timer !== null) window.clearTimeout(this.timer);
-    if (this.displayed >= fullText.length) return;
-    const chunk = Math.min(3, fullText.length - this.displayed);
-    this.displayed += chunk;
-    el.textContent = fullText.slice(0, this.displayed);
-    if (this.displayed < fullText.length) {
-      const backlog = fullText.length - this.displayed;
-      this.timer = window.setTimeout(() => this.renderNext(el, fullText), backlog > 50 ? 2 : this.speed);
-    }
+    el.scrollTop = el.scrollHeight;
   }
 }
 // ========== 设置面板 ==========
