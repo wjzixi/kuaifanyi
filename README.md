@@ -65,16 +65,7 @@
 
 > 💡 弹窗内也有 ⇄ 按钮可快捷切换，切换后立即重新翻译/解释
 
-## ☕ 赞助
 
-最低 **¥5**，心意不分多少：
-
-<table>
-  <tr>
-    <td align="center"><img src="assets/sponsor-wechat.png" width="200"><br><b>微信支付</b></td>
-    <td align="center"><img src="assets/sponsor-alipay.jpg" width="200"><br><b>支付宝</b></td>
-  </tr>
-</table>
 
 </details>
 
@@ -139,14 +130,7 @@
 
 > 💡 In-popup ⇄ buttons allow quick switching; re-translates/re-explains immediately
 
-## ☕ Sponsor
 
-<table>
-  <tr>
-    <td align="center"><img src="assets/sponsor-wechat.png" width="200"><br><b>WeChat Pay</b></td>
-    <td align="center"><img src="assets/sponsor-alipay.jpg" width="200"><br><b>Alipay</b></td>
-  </tr>
-</table>
 
 </details>
 
