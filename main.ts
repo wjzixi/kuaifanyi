@@ -347,7 +347,7 @@ export default class KuaifanyiPlugin extends Plugin {
         const start = new Date(Date.now() - 58 * 86400000).toISOString().slice(0, 10);
         const end = d.toISOString().slice(0, 10);
         const chars = await fetchVolcanoUsage(volcanoAccessKeyId, volcanoSecretAccessKey, volcanoAppId, start, end);
-        if (chars !== null) this.volcanoOfficialChars = chars; // 0 也是有效值（新月份清零）
+        if (chars !== null) { this.volcanoOfficialChars = chars; this.updateUsage(); }
       } catch { /* Expected */ }
     }
   }
