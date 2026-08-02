@@ -490,6 +490,9 @@ export default class KuaifanyiPlugin extends Plugin {
     delete (this.settings as unknown as Record<string, unknown>).sourceLang;
     delete (this.settings as unknown as Record<string, unknown>).systemPrompt;
     delete (this.settings as unknown as Record<string, unknown>).volcanoVoice;
+    delete (this.settings as unknown as Record<string, unknown>).volcanoMonth;
+    delete (this.settings as unknown as Record<string, unknown>).volcanoMonthChars;
+    delete (this.settings as unknown as Record<string, unknown>).volcanoMonthCalls;
     delete (this.settings as unknown as Record<string, unknown>).edgeTtsEnabled;
     const legacyData: Record<string, unknown> | null = stored;
     // 迁移：TTS 引擎双选（火山/Edge），旧 system 归并火山
