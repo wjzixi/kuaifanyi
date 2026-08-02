@@ -299,9 +299,10 @@ export default class KuaifanyiPlugin extends Plugin {
     }
   }
 
-  /** API 调用完成后动态同步：拉官方余额/用量 → 更新弹窗显示 */
+  /** API 调用完成后动态同步：先即时显示当前值，再异步拉最新官方数据 */
   private refreshUsageDynamic(): void {
-    void this.refreshBalance();
+    this.updateUsage(); // 先立即刷新（用缓存值，用户立刻看到反馈）
+    void this.refreshBalance().then(() => this.updateUsage()); // 再拉官方最新
   }
 
   private async refreshBalance(): Promise<void> {
