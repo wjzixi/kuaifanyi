@@ -343,8 +343,8 @@ export default class KuaifanyiPlugin extends Plugin {
       } catch { /* Expected */ }
       try {
         const d = new Date();
-        // API 有最大跨度限制（约 90 天），取 7 月起覆盖全量历史
-        const start = "2026-07-01";
+        // API 最大跨度限制：动态取最早可查日期（今天 - 58 天）
+        const start = new Date(Date.now() - 58 * 86400000).toISOString().slice(0, 10);
         const end = d.toISOString().slice(0, 10);
         const chars = await fetchVolcanoUsage(volcanoAccessKeyId, volcanoSecretAccessKey, volcanoAppId, start, end);
         if (chars !== null) this.volcanoOfficialChars = chars; // 0 也是有效值（新月份清零）
