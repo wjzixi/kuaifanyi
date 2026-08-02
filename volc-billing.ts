@@ -92,8 +92,9 @@ export async function fetchVolcanoUsage(ak: string, sk: string, appId: string, s
   try {
     const q = `Action=UsageMonitoring&AppID=${appId}&End=${end}&Mode=daily&ResourceID=volc.seedtts.default&Start=${start}&Version=2021-08-30`;
     const result = await signedGet("open.volcengineapi.com", "speech_saas_prod", "cn-north-1", q, ak, sk);
-    if (result.status !== 200 || !result.json || (result.json as Record<string, unknown>).status !== "success") return null;
-    const um = (result.json as { data?: { usage_monitoring?: Array<{ value?: number }> } })?.data?.usage_monitoring;
+    if (result.status !== 200 || !result.json) return null;
+    // V4 签名响应没有顶层 status，数据直接在 data.usage_monitoring
+    const um = (result.json as { data?: { usage_monitoring?: Array<{ day?: string; value?: number }> } })?.data?.usage_monitoring;
     if (!Array.isArray(um)) return null;
     return um.reduce((s: number, x: { value?: number }) => s + (x.value || 0), 0);
   } catch { return null; }
