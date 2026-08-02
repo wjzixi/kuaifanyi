@@ -90,7 +90,7 @@ export async function fetchVolcanoBalance(ak: string, sk: string): Promise<numbe
 /** 查询本月语音合成大模型官方用量（字符），失败/无数据返回 null */
 export async function fetchVolcanoUsage(ak: string, sk: string, appId: string, start: string, end: string): Promise<number | null> {
   try {
-    const q = `Action=UsageMonitoring&AppID=${appId}&End=${end}&Mode=daily&ResourceID=volc.seedtts.default&Start=${start}&Version=2021-08-30`;
+    const q = `Action=UsageMonitoring&AppID=${appId}&End=${end}&Mode=daily&ResourceID=volc.service_type.10029&Start=${start}&Version=2021-08-30`;
     const result = await signedGet("open.volcengineapi.com", "speech_saas_prod", "cn-north-1", q, ak, sk);
     if (result.status !== 200 || !result.json || (result.json as Record<string, unknown>).status !== "success") return null;
     const um = (result.json as { data?: { usage_monitoring?: Array<{ value?: number }> } })?.data?.usage_monitoring;
