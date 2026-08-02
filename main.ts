@@ -287,12 +287,10 @@ export default class KuaifanyiPlugin extends Plugin {
       line1.textContent = providerName + "  " + dsParts.join("  ·  ");
     }
 
-    // 第二行：语音合成（官方为准；当天新合成官方未结算时本地更准，取大者不回退）
+    // 第二行：语音合成（仅显示火山官方 API 数据，本地不累计）
     if (this.settings.ttsEngine === "volcano") {
-      const local = this.settings.volcanoMonthChars;
-      const api = this.volcanoOfficialChars;
-      const used = api !== null ? Math.max(api, local) : local;
-      const chars = `${used.toLocaleString()} 字`;
+      const used = this.volcanoOfficialChars;
+      const chars = used !== null ? `${used.toLocaleString()} 字` : "—";
       const vParts: string[] = [
         `${chars} / ${VOLCANO_MONTHLY_QUOTA.toLocaleString()} 字`,
       ];
@@ -518,10 +516,7 @@ export default class KuaifanyiPlugin extends Plugin {
       this.settings.explainLang = "zh";
       dirty = true;
     }
-    // 不持久化：启动时重置计数并清官方缓存
-    this.settings.volcanoMonth = "";
-    this.settings.volcanoMonthChars = 0;
-    this.settings.volcanoMonthCalls = 0;
+    // 不持久化：启动时重置官方缓存
     this.volcanoOfficialChars = null;
     // 一次性清理磁盘残留（仅当有脏字段时写一次）
     if (dirty) await this.saveSettings();

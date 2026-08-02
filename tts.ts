@@ -84,10 +84,7 @@ let queue: SpeechSynthesisUtterance[] = [];
 let speaking = false;
 let speakGen = 0; // 发言代数计数器，保证同一时间只有一个输出
 
-/** 火山合成字符统计（本次会话） */
-export const volcanoUsage = { chars: 0, calls: 0 };
-
-/** 本月免费额度（大模型语音合成：2万字符/月） */
+/** 语音合成用量：仅展示火山官方 API 返回值，不做本地累加 */
 export const VOLCANO_MONTHLY_QUOTA = 20000;
 
 // ---- TTS 状态回调 ----
@@ -100,17 +97,6 @@ function emitState(s: TtsState): void {
   if (onStateChange) onStateChange(s);
 }
 
-/** 记录用量到设置（跨月自动清零），返回当月累计 */
-export function trackMonthly(s: KuaifanyiSettings, chars: number): number {
-  const nowMonth = new Date().toISOString().slice(0, 7); // "2026-07"
-  if (s.volcanoMonth !== nowMonth) {
-    s.volcanoMonth = nowMonth;
-    s.volcanoMonthChars = 0;
-  }
-  s.volcanoMonthChars += chars;
-  s.volcanoMonthCalls += 1;
-  return s.volcanoMonthChars;
-}
 
 /**
  * 清洗文本供朗读：
@@ -373,10 +359,6 @@ async function volcanoSpeak(text: string, settings: KuaifanyiSettings, slot: Spe
         blob = await synthWithFallback(chunk, settings, voice);
         if (myGen !== speakGen) break;
         emitState("synthesizing");
-        // 仅真正上传合成后才计用量（缓存命中不计，避免虚耗月度额度统计）
-        volcanoUsage.chars += chunk.length;
-        volcanoUsage.calls += 1;
-        trackMonthly(settings, chunk.length);
         if (cacheDir) await saveToCache(chunk, voice, blob, cacheDir);
       }
       if (myGen !== speakGen) break;

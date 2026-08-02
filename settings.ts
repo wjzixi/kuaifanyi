@@ -61,10 +61,6 @@ export interface KuaifanyiSettings {
   // 多语言（翻译/解释目标语言分开设置）
   targetLang: string;
   explainLang: string;
-  // 本月用量（自动维护，无需手填）
-  volcanoMonth: string;
-  volcanoMonthChars: number;
-  volcanoMonthCalls: number;
 }
 
 export const DEFAULT_SETTINGS: KuaifanyiSettings = {
@@ -104,7 +100,4 @@ export const DEFAULT_SETTINGS: KuaifanyiSettings = {
   youdaoKey: "",
   targetLang: "zh",
   explainLang: "zh",
-  volcanoMonth: "",
-  volcanoMonthChars: 0,
-  volcanoMonthCalls: 0,
 };
