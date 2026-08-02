@@ -31,7 +31,6 @@ export default class KuaifanyiPlugin extends Plugin {
   private balanceText = "";
   private volcanoBalanceText = "";
   private volcanoOfficialChars: number | null = null;
-  private refreshing = false; // refreshBalance 防并发重入
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -302,17 +301,12 @@ export default class KuaifanyiPlugin extends Plugin {
 
   /** API 调用完成后动态同步：拉官方余额/用量 → 更新弹窗显示 */
   private refreshUsageDynamic(): void {
-    void this.refreshBalance().then(() => this.updateUsage());
+    void this.refreshBalance();
   }
 
   private async refreshBalance(): Promise<void> {
-    if (this.refreshing) return; // 防并发重入（多个完成回调同时触发）
-    this.refreshing = true;
-    try {
-      await this.doRefreshBalance();
-    } finally {
-      this.refreshing = false;
-    }
+    await this.doRefreshBalance();
+    this.updateUsage(); // 每次刷新后立即更新弹窗显示
   }
 
   /** 实际拉取：提供商余额 + 火山 TTS 余额/官方用量 */
