@@ -342,8 +342,8 @@ export default class KuaifanyiPlugin extends Plugin {
       } catch { /* Expected */ }
       try {
         const d = new Date();
-        // 火山免费额度是一次性赠送（非每月重置），查全量历史
-        const start = "2025-01-01";
+        // API 有最大跨度限制（约 90 天），取 7 月起覆盖全量历史
+        const start = "2026-07-01";
         const end = d.toISOString().slice(0, 10);
         const chars = await fetchVolcanoUsage(volcanoAccessKeyId, volcanoSecretAccessKey, volcanoAppId, start, end);
         if (chars !== null) this.volcanoOfficialChars = chars; // 0 也是有效值（新月份清零）
